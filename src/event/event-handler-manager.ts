@@ -1,4 +1,14 @@
-import { Log } from '@just-in/core';
+import {
+  createLogger,
+  type Logger,
+  type BaseSeverity,
+} from '@just-in/core';
+
+const Log = createLogger({
+  context: {
+    component: 'EventHandlerManager',
+  },
+});
 
 export class EventHandlerManager {
   private handlerMap: Map<string, string[]>;
@@ -25,21 +35,28 @@ export class EventHandlerManager {
    *
    * @param {string} eventType - The type of event (e.g., 'CUSTOM_EVENT').
    * @param {string[]} handlerNames - The list of handler names associated with the event.
+   * @param overwriteExisting - Whether to overwrite an existing registration for this eventType.
    * @returns {Promise<void>}
    */
   public registerEventHandlers = async (
     eventType: string,
     handlerNames: string[],
-    overwriteExisting: boolean = false
+    overwriteExisting: boolean = false,
   ): Promise<void> => {
     this.validateEventHandlerParams(eventType, handlerNames);
     if (this.hasHandlersForEventType(eventType) && !overwriteExisting) {
-      Log.error(`Event registration failed.Event "${eventType}" already registered.`);
+      Log.error('Event registration failed: event already registered.', {
+        eventType,
+        handlerNames,
+      });
       throw new Error(`Event "${eventType}" already registered.`);
     } else {
       this.handlerMap.set(eventType, handlerNames);
     }
-    Log.info(`Event "${eventType}" registered with handlers: ${handlerNames} and added to the event registry.`);
+    Log.info('Event registered and added to the event registry.', {
+      eventType,
+      handlerNames,
+    });
   };
 
   /**
@@ -50,9 +67,11 @@ export class EventHandlerManager {
   public unregisterEventHandlers = (eventType: string): void => {
     if (this.hasHandlersForEventType(eventType)) {
       this.handlerMap.delete(eventType);
-      Log.info(`Event "${eventType}" unregistered.`);
+      Log.info('Event unregistered.', { eventType });
     } else {
-      Log.warn(`Unregister event failed. Event "${eventType}" not found in the event registry.`);
+      Log.warn('Unregister event failed: event not found in the registry.', {
+        eventType,
+      });
     }
   };
 
@@ -64,9 +83,11 @@ export class EventHandlerManager {
    * @throws {Error} If the eventType or handlers are invalid.
    */
   private validateEventHandlerParams = (
-    eventType: string, handlerNames: string[]): void => {
+    eventType: string,
+    handlerNames: string[],
+  ): void => {
     if (!eventType || typeof eventType !== 'string') {
-      Log.error(`Invalid event type: "${eventType}"`);
+      Log.error('Invalid event type.', { eventType });
       throw new Error('Event name must be a non-empty string.');
     }
     if (
@@ -74,7 +95,10 @@ export class EventHandlerManager {
       handlerNames.length === 0 ||
       !handlerNames.every((h) => typeof h === 'string' && h !== '')
     ) {
-      Log.error(`Invalid handler names for event "${eventType}": ${handlerNames}`);
+      Log.error('Invalid handler names for event.', {
+        eventType,
+        handlerNames,
+      });
       throw new Error('Handler names must be a non-empty array of strings.');
     }
   };
@@ -87,7 +111,7 @@ export class EventHandlerManager {
    */
   public getHandlersForEventType = (eventType: string): string[] => {
     if (!this.hasHandlersForEventType(eventType)) {
-      Log.error(`No handlers found for event type "${eventType}".`);
+      Log.error('No handlers found for event type.', { eventType });
       return [];
     }
     return this.handlerMap.get(eventType) ?? [];
@@ -108,6 +132,8 @@ export class EventHandlerManager {
    */
   public clearEventHandlers = (): void => {
     this.handlerMap.clear();
-    Log.info(`All event handlers cleared. handler map now: ${JSON.stringify(this.handlerMap)}.`);
+    Log.info('All event handlers cleared.', {
+      handlerCount: 0,
+    });
   };
 }

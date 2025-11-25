@@ -1,5 +1,11 @@
-import { Log } from '@just-in/core';
+import { createLogger } from '@just-in/core';
 import { StepReturnResult, ExecuteStepReturn } from './handler.type';
+
+const Log = createLogger({
+  context: {
+    component: 'steps handler utils',
+  },
+});
 
 /**
  * Executes a single step function, logging errors and results.
@@ -23,7 +29,10 @@ export async function executeStep<T>(
 
     return { step, result, timestamp };
   } catch (error) {
-    Log.error(`Error in step "${step}": ${error}, stack: ${error instanceof Error ? error.stack : 'No stack trace available'}`);
+    Log.error('Error in step execution.', {
+      step,
+      error,
+    });
     return { step, result: { status: 'error', error }, timestamp };
   }
 }

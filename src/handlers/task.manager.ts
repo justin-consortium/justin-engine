@@ -1,8 +1,21 @@
-import { ExecuteStepReturn, HandlerType, Task, TaskRegistration, TaskStep} from './handler.type';
-import { Log, JUser } from '@just-in/core';
+import { createLogger } from '@just-in/core';
+import type { JUser } from '@just-in/core';
+import {
+  ExecuteStepReturn,
+  HandlerType,
+  Task,
+  TaskRegistration,
+  TaskStep,
+} from './handler.type';
 import { executeStep } from './steps.helpers';
 import { JEvent } from '../event/event.type';
-import {handleTaskResult} from "./result-recorder";
+import { handleTaskResult } from './result-recorder';
+
+const Log = createLogger({
+  context: {
+    component: 'TaskManager',
+  },
+});
 
 const tasks: Map<string, Task> = new Map();
 
@@ -12,7 +25,7 @@ const tasks: Map<string, Task> = new Map();
  */
 export const registerTask = (task: TaskRegistration): void => {
   tasks.set(task.name, { ...task, type: HandlerType.TASK });
-  Log.info(`Task "${task.name}" registered successfully.`);
+  Log.info('Task registered successfully.', { taskName: task.name });
 };
 
 /**
@@ -34,34 +47,47 @@ export const getTaskByName = (name: string): Task | undefined => {
 export async function executeTask(
   task: Task,
   event: JEvent,
-  user: JUser
+  user: JUser,
 ): Promise<void> {
   const results: ExecuteStepReturn<any>[] = [];
 
   try {
-    Log.info(
-      `Executing task "${task.name}" for user "${user.id}" in event "${event.eventType}".`
-    );
+    Log.info('Executing task for user and event.', {
+      taskName: task.name,
+      user,
+      event,
+    });
 
     const shouldActivateResult = await executeStep(
       TaskStep.SHOULD_ACTIVATE,
-      async () => Promise.resolve(task.shouldActivate(user, event))
+      async () => Promise.resolve(task.shouldActivate(user, event)),
     );
 
     if (shouldActivateResult.result.status === 'success') {
       results.push(shouldActivateResult);
+
       const actionResult = await executeStep(TaskStep.DO_ACTION, async () =>
-        Promise.resolve(task.doAction(user, event, shouldActivateResult.result))
+        Promise.resolve(
+          task.doAction(user, event, shouldActivateResult.result),
+        ),
       );
       results.push(actionResult);
     } else {
-      Log.dev(`Task "${task.name}" for user "${user.id}" in event "${event.eventType}" did not activate.`);
+      Log.debug('Task did not activate.', {
+        taskName: task.name,
+        user,
+        event,
+        stepResult: shouldActivateResult.result,
+      });
       return;
     }
   } catch (error) {
-    Log.error(
-      `Error executing task "${task.name}" for user "${user.id}": ${error}`
-    );
+    Log.error('Error executing task for user.', {
+      taskName: task.name,
+      user,
+      event,
+      error,
+    });
     results.push({
       step: 'unknown',
       result: { status: 'error', error },
@@ -76,8 +102,11 @@ export async function executeTask(
         user,
       });
     }
-    Log.info(
-      `Completed execution of task "${task.name}" for user "${user.id}".`
-    );
+    Log.info('Completed execution of task for user.', {
+      taskName: task.name,
+      user,
+      event,
+      steps: results,
+    });
   }
 }

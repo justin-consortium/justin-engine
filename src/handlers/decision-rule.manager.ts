@@ -1,4 +1,4 @@
-import { Log,JUser } from '@just-in/core';
+import { createLogger, JUser } from '@just-in/core';
 import {
   DecisionRule,
   HandlerType,
@@ -8,7 +8,13 @@ import {
 } from './handler.type';
 import { JEvent } from '../event/event.type';
 import { executeStep } from './steps.helpers';
-import { handleDecisionRuleResult } from "./result-recorder";
+import { handleDecisionRuleResult } from './result-recorder';
+
+const Log = createLogger({
+  context: {
+    component: 'DecisionRuleManager',
+  },
+});
 
 const decisionRules: Map<string, DecisionRule> = new Map();
 
@@ -25,7 +31,7 @@ const decisionRules: Map<string, DecisionRule> = new Map();
  */
 export const registerDecisionRule = (rule: DecisionRuleRegistration): void => {
   decisionRules.set(rule.name, { ...rule, type: HandlerType.DECISION_RULE });
-  Log.info(`Decision rule "${rule.name}" registered successfully.`);
+  Log.info('Decision rule registered successfully.', { ruleName: rule.name });
 };
 
 /**
@@ -34,9 +40,7 @@ export const registerDecisionRule = (rule: DecisionRuleRegistration): void => {
  * @param {string} name - The name of the DecisionRule to retrieve.
  * @returns {DecisionRule | undefined} - The DecisionRule object if found, otherwise `undefined`.
  */
-export const getDecisionRuleByName = (
-  name: string
-): DecisionRule | undefined => {
+export const getDecisionRuleByName = (name: string): DecisionRule | undefined => {
   return decisionRules.get(name);
 };
 
@@ -56,28 +60,32 @@ export const getDecisionRuleByName = (
 export async function executeDecisionRule(
   rule: DecisionRule,
   event: JEvent,
-  user: JUser
+  user: JUser,
 ): Promise<void> {
   const results: ExecuteStepReturn[] = [];
-  let decisionRuleExecutionStatus: "not activated" | "activated" | "error" | "finished" = "not activated";
+  let decisionRuleExecutionStatus: 'not activated' | 'activated' | 'error' | 'finished' =
+    'not activated';
 
   try {
-    Log.dev(
-      `Starting decision rule "${rule.name}" for user "${user.id}" in event "${event.eventType}" with ID: ${event.id}.`
-    );
+    Log.debug('Starting decision rule execution.', {
+      ruleName: rule.name,
+      user,
+      event,
+    });
 
     const shouldActivateResult = await executeStep(
       DecisionRuleStep.SHOULD_ACTIVATE,
-      async () => Promise.resolve(rule.shouldActivate(user, event))
+      async () => Promise.resolve(rule.shouldActivate(user, event)),
     );
 
     if (shouldActivateResult.result.status === 'success') {
-      decisionRuleExecutionStatus = "activated";
+      decisionRuleExecutionStatus = 'activated';
       results.push(shouldActivateResult);
+
       const selectionActionResult = await executeStep(
         DecisionRuleStep.SELECT_ACTION,
         async () =>
-          Promise.resolve(rule.selectAction(user, event, shouldActivateResult.result))
+          Promise.resolve(rule.selectAction(user, event, shouldActivateResult.result)),
       );
       results.push(selectionActionResult);
 
@@ -85,20 +93,30 @@ export async function executeDecisionRule(
         const actionResult = await executeStep(
           DecisionRuleStep.DO_ACTION,
           async () =>
-            Promise.resolve(rule.doAction(user, event, selectionActionResult.result))
+            Promise.resolve(
+              rule.doAction(user, event, selectionActionResult.result),
+            ),
         );
         results.push(actionResult);
       }
-      decisionRuleExecutionStatus = "finished";
-    } else {
-      Log.dev(`Decision rule "${rule.name}" for user "${user.id}" in event "${event.eventType}" did not activate.`);
-    }
 
+      decisionRuleExecutionStatus = 'finished';
+    } else {
+      Log.debug('Decision rule did not activate.', {
+        ruleName: rule.name,
+        user,
+        event,
+        stepResult: shouldActivateResult.result,
+      });
+    }
   } catch (error) {
-    decisionRuleExecutionStatus = "error";
-    Log.error(
-      `Error processing decision rule "${rule.name}" for user "${user.id}" in event "${event.eventType}": ${error}`
-    );
+    decisionRuleExecutionStatus = 'error';
+    Log.error('Error processing decision rule.', {
+      ruleName: rule.name,
+      user,
+      event,
+      error,
+    });
     results.push({
       step: 'unknown',
       result: { status: 'error', error },
@@ -106,13 +124,16 @@ export async function executeDecisionRule(
     });
   } finally {
     handleDecisionRuleResult({
-        event,
-        name: rule.name,
-        steps: results,
-        user,
-      });
-    Log.info(
-      `Decision rule "${rule.name}" completed for user "${user.uniqueIdentifier}" in event "${event.eventType}": ${decisionRuleExecutionStatus}.`
-    );
+      event,
+      name: rule.name,
+      steps: results,
+      user,
+    });
+    Log.info('Decision rule completed.', {
+      ruleName: rule.name,
+      user,
+      event,
+      status: decisionRuleExecutionStatus,
+    });
   }
 }

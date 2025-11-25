@@ -1,4 +1,10 @@
-import DataManager, { ChangeListenerManager, UserManager, Log, JUser, CollectionChangeType } from '@just-in/core';
+import DataManager, {
+  ChangeListenerManager,
+  UserManager,
+  CollectionChangeType,
+  createLogger,
+} from '@just-in/core';
+import type { JUser } from '@just-in/core';
 import { JEvent } from './event.type';
 
 import { executeTask, getTaskByName } from '../handlers/task.manager';
@@ -7,8 +13,8 @@ import {
   getDecisionRuleByName,
 } from '../handlers/decision-rule.manager';
 import { EventHandlerManager } from './event-handler-manager';
-import { executeEventForUsers } from "./event-executor";
-import { ARCHIVED_EVENTS, EVENT_QUEUE } from "../constants";
+import { executeEventForUsers } from './event-executor';
+import { ARCHIVED_EVENTS, EVENT_QUEUE } from '../constants';
 
 const dataManager = DataManager.getInstance();
 const clm = ChangeListenerManager.getInstance();
@@ -17,6 +23,12 @@ const eventHandlerManager = EventHandlerManager.getInstance();
 let isProcessingQueue = false;
 let shouldProcessQueue = true;
 
+// Package-local logger for the event queue module
+const Log = createLogger({
+  context: {
+    component: 'event-queue',
+  },
+});
 
 /**
  * Triggers an event by creating an instance in the `EVENTS_QUEUE`.
@@ -24,11 +36,13 @@ let shouldProcessQueue = true;
 export const publishEvent = async (
   eventType: string,
   generatedTimestamp: Date,
-  eventDetails?: Record<string, any>
+  eventDetails?: Record<string, any>,
 ): Promise<void> => {
   try {
     if (!eventHandlerManager.hasHandlersForEventType(eventType)) {
-      Log.warn(`No handlers found for event type "${eventType}". Skipping event publication.`);
+      Log.warn('No handlers found for event type; skipping event publication.', {
+        eventType,
+      });
       return;
     }
 
@@ -39,12 +53,21 @@ export const publishEvent = async (
       eventDetails,
     };
 
-    const addedEvent = await dataManager.addItemToCollection(EVENT_QUEUE, eventInstance) as JEvent;
-    Log.info(
-      `Published event "${eventInstance.eventType}" with ID: ${addedEvent.id}.`
-    );
+    const addedEvent = (await dataManager.addItemToCollection(
+      EVENT_QUEUE,
+      eventInstance,
+    )) as JEvent;
+
+    Log.info('Published event.', {
+      eventType: eventInstance.eventType,
+      eventId: addedEvent.id,
+      event: addedEvent,
+    });
   } catch (error) {
-    Log.error(`Failed to publish event "${eventType}": ${error}`);
+    Log.error('Failed to publish event.', {
+      eventType,
+      error,
+    });
     throw error;
   }
 };
@@ -54,44 +77,48 @@ export const publishEvent = async (
  */
 export const processEventQueue = async (): Promise<void> => {
   if (isProcessingQueue) {
-    Log.info('Event queue processing already in progress. Skipping processing.');
+    Log.info('Event queue processing already in progress; skipping new run.');
     return;
   }
 
   isProcessingQueue = true;
 
   try {
-    Log.dev('Starting event queue processing.');
+    Log.debug('Starting event queue processing.');
 
     while (shouldProcessQueue) {
       const users = UserManager.getAllUsers();
       const events = (await dataManager.getAllInCollection(
-        EVENT_QUEUE
+        EVENT_QUEUE,
       )) as JEvent[];
 
       if (!events || events.length === 0) {
-        Log.dev('No events left in the queue. Pausing processing.');
+        Log.debug('No events left in the queue; pausing processing.');
         break;
       }
 
       for (const event of events) {
-        Log.dev(`Processing event "${event.eventType}" with ID: ${event.id} for ${users.length} users.`);
+        Log.debug('Processing event for users.', {
+          event,
+          userCount: users.length,
+        });
 
         await executeEventForUsers(event, users, eventHandlerManager);
 
         try {
           await archiveEvent(event);
         } catch (error) {
-          Log.error(
-            `Failed to archive event "${event.eventType}" with ID: ${event.id}: ${error}`
-          );
+          Log.error('Failed to archive event after processing.', {
+            event,
+            error,
+          });
         }
       }
     }
 
-    Log.dev('Finished processing event queue.');
+    Log.debug('Finished processing event queue.');
   } catch (error) {
-    Log.error(`Error during event queue processing: ${error}`);
+    Log.error('Error during event queue processing.', { error });
   } finally {
     isProcessingQueue = false;
   }
@@ -102,32 +129,45 @@ export const processEventQueue = async (): Promise<void> => {
  */
 export const setupEventQueueListener = async (): Promise<void> => {
   try {
-    Log.dev('Setting up event queue listener.');
+    Log.debug('Setting up event queue listener.');
+
     if (clm.hasChangeListener(EVENT_QUEUE, CollectionChangeType.INSERT)) {
-      Log.info('Event queue listener already set up. Skipping setup.');
+      Log.info('Event queue listener already set up; skipping setup.');
       return;
     }
 
-    clm.addChangeListener(EVENT_QUEUE, CollectionChangeType.INSERT, async () => {
-      if (shouldProcessQueue) {
-        Log.dev('New event detected in EVENTS_QUEUE. Triggering processing.');
-        await processEventQueue();
-      }
-    });
+    clm.addChangeListener(
+      EVENT_QUEUE,
+      CollectionChangeType.INSERT,
+      async () => {
+        if (shouldProcessQueue) {
+          Log.debug(
+            'New event detected in EVENTS_QUEUE; triggering processing.',
+          );
+          await processEventQueue();
+        }
+      },
+    );
 
+    // Kick off processing once on startup as well.
     await processEventQueue();
 
-    Log.dev('Event queue listener set up successfully.');
+    Log.debug('Event queue listener set up successfully.');
   } catch (error) {
-    Log.error(`Error setting up event queue listener: ${error}`);
+    Log.error('Error setting up event queue listener.', { error });
   }
 };
 
 /**
  * Processes assignments (tasks or decision rules) for an event and user.
+ *
+ * NOTE: This helper is currently unused by processEventQueue, but kept for
+ * potential future refactors.
  */
 const processHandlers = async (event: JEvent, user: JUser): Promise<void> => {
-  for (const handlerName of eventHandlerManager.getHandlersForEventType(event.eventType)) {
+  for (const handlerName of eventHandlerManager.getHandlersForEventType(
+    event.eventType,
+  )) {
     try {
       const task = getTaskByName(handlerName);
       if (task) {
@@ -141,13 +181,17 @@ const processHandlers = async (event: JEvent, user: JUser): Promise<void> => {
         continue;
       }
 
-      Log.warn(
-        `Handler "${handlerName}" not found for event "${event.eventType}".`
-      );
+      Log.warn('Handler not found for event; skipping.', {
+        handlerName,
+        event,
+      });
     } catch (error) {
-      Log.error(
-        `Error processing assignment "${handlerName}" for event "${event.eventType}" and user "${user.id}": ${error}`
-      );
+      Log.error('Error processing assignment for event and user.', {
+        handlerName,
+        event,
+        user,
+        error,
+      });
     }
   }
 };
@@ -155,27 +199,33 @@ const processHandlers = async (event: JEvent, user: JUser): Promise<void> => {
 const processExecutionLifecycle = async (
   handlerName: string,
   event: JEvent,
-  functionName: "beforeExecution" | "afterExecution"
+  functionName: 'beforeExecution' | 'afterExecution',
 ): Promise<void> => {
   try {
     const task = getTaskByName(handlerName);
-    if (task && typeof task[functionName] === "function") {
+    if (task && typeof task[functionName] === 'function') {
       await task[functionName](event);
       return;
     }
 
     const decisionRule = getDecisionRuleByName(handlerName);
-    if (decisionRule && typeof decisionRule[functionName] === "function") {
+    if (decisionRule && typeof decisionRule[functionName] === 'function') {
       await decisionRule[functionName](event);
       return;
     }
 
-    // Log warning if function is not found
-    Log.dev(`"${functionName}" not found for handler "${handlerName}".`);
+    Log.debug('Lifecycle function not found for handler.', {
+      functionName,
+      handlerName,
+      event,
+    });
   } catch (error) {
-    Log.error(
-      `Error executing "${functionName}" for handler "${handlerName}" and event "${event.eventType}": ${error}`
-    );
+    Log.error('Error executing lifecycle function for handler.', {
+      functionName,
+      handlerName,
+      event,
+      error,
+    });
   }
 };
 
@@ -184,20 +234,21 @@ const processExecutionLifecycle = async (
  */
 const archiveEvent = async (event: JEvent): Promise<void> => {
   try {
-    Log.dev(`Archiving event of type "${event.eventType}" with ID: ${event.id}.`);
+    Log.debug('Archiving event.', { event });
+
     await dataManager.addItemToCollection(ARCHIVED_EVENTS, event);
+
     if (event.id) {
       await dataManager.removeItemFromCollection(EVENT_QUEUE, event.id);
     } else {
-      Log.error(`Event "${event}" has no ID. Skipping archiving.`);
+      Log.error('Event has no ID; skipping removal from EVENTS_QUEUE.', {
+        event,
+      });
     }
-    Log.dev(
-      `Event of type "${event.eventType}" with ID: ${event.id} archived successfully.`
-    );
+
+    Log.debug('Event archived successfully.', { event });
   } catch (error) {
-    Log.error(
-      `Failed to archive event "${event.eventType}" with ID: ${event.id}: ${error}`
-    );
+    Log.error('Failed to archive event.', { event, error });
     throw error;
   }
 };
@@ -217,7 +268,7 @@ export const stopEventQueueProcessing = (): void => {
 export const startEventQueueProcessing = async (): Promise<void> => {
   await setupEventQueueListener();
   shouldProcessQueue = true;
-  Log.dev('Event queue processing started.');
+  Log.debug('Event queue processing started.');
 };
 
 /**

@@ -1,8 +1,17 @@
-import { Log, JUser } from '@just-in/core';
+import {
+  JUser,
+  createLogger,
+} from '@just-in/core';
 import type { JEvent } from './event.type';
 import { EventHandlerManager } from './event-handler-manager';
 import { getTaskByName, executeTask } from '../handlers/task.manager';
 import { getDecisionRuleByName, executeDecisionRule } from '../handlers/decision-rule.manager';
+
+const Log = createLogger({
+  context: {
+    component: 'executeEventForUsers',
+  },
+});
 
 /**
  * Executes a registered event against a set of users:
@@ -15,11 +24,11 @@ import { getDecisionRuleByName, executeDecisionRule } from '../handlers/decision
 export async function executeEventForUsers(
   event: JEvent,
   users: JUser[],
-  handlerManager: EventHandlerManager
+  handlerManager: EventHandlerManager,
 ): Promise<void> {
   const handlerNames = handlerManager.getHandlersForEventType(event.eventType);
   if (!handlerNames.length) {
-    Log.warn(`No handlers registered for event type "${event.eventType}".`);
+    Log.warn('No handlers registered for event type.', { event });
     return;
   }
 
@@ -36,7 +45,11 @@ export async function executeEventForUsers(
         if (task?.beforeExecution) await task.beforeExecution(event);
         if (rule?.beforeExecution) await rule.beforeExecution(event);
       } catch (err) {
-        Log.error(`beforeExecution error for "${handlerName}" on event "${event.eventType}": ${err}`);
+        Log.error('beforeExecution error for handler.', {
+          handlerName,
+          event,
+          error: err,
+        });
       } finally {
         beforeRan.add(handlerName);
       }
@@ -44,17 +57,24 @@ export async function executeEventForUsers(
 
     // PER-USER
     for (const user of users) {
-      const uid = user.uniqueIdentifier ?? user.id;
       try {
         if (task) {
           await executeTask(task, event, user);
         } else if (rule) {
           await executeDecisionRule(rule, event, user);
         } else {
-          Log.warn(`Handler "${handlerName}" not found; skipping.`);
+          Log.warn('Handler not found; skipping.', {
+            handlerName,
+            event,
+          });
         }
       } catch (err) {
-        Log.error(`Execution error for "${handlerName}" on user "${uid}" (event "${event.eventType}"): ${err}`);
+        Log.error('Execution error for handler on user.', {
+          handlerName,
+          user,
+          event,
+          error: err,
+        });
       }
     }
 
@@ -64,7 +84,11 @@ export async function executeEventForUsers(
         if (task?.afterExecution) await task.afterExecution(event);
         if (rule?.afterExecution) await rule.afterExecution(event);
       } catch (err) {
-        Log.error(`afterExecution error for "${handlerName}" on event "${event.eventType}": ${err}`);
+        Log.error('afterExecution error for handler.', {
+          handlerName,
+          event,
+          error: err,
+        });
       } finally {
         afterRan.add(handlerName);
       }

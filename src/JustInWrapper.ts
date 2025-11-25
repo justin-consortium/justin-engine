@@ -1,14 +1,10 @@
-import DataManager,  {
+import DataManager, {
   DBType,
   UserManager,
-  NewUserRecord,
-  JUser,
-  Logger,
-  setLogger,
-  setLogLevels,
-  Log,
-  logLevels,
+  createLogger,
+  configureLogger as configureCoreLogger,
 } from '@just-in/core';
+import type { NewUserRecord, JUser, LoggerConfig } from '@just-in/core';
 import { EventHandlerManager } from './event/event-handler-manager';
 import {
   publishEvent,
@@ -21,12 +17,28 @@ import { registerTask } from './handlers/task.manager';
 import { registerDecisionRule } from './handlers/decision-rule.manager';
 import {
   TaskRegistration,
-  DecisionRuleRegistration, RecordResultFunction,
+  DecisionRuleRegistration,
+  RecordResultFunction,
 } from './handlers/handler.type';
 import { IntervalTimerEventGenerator } from './event/interval-timer-event-generator';
 import { IntervalTimerEventGeneratorOptions } from './event/event.type';
-import { setDecisionRuleResultRecorder, setTaskResultRecorder } from "./handlers/result-recorder";
+import {
+  setDecisionRuleResultRecorder,
+  setTaskResultRecorder,
+} from './handlers/result-recorder';
 
+const Log = createLogger({
+  context: {
+    component: 'JustInWrapper',
+  },
+});
+
+const baseLoggingContext: Pick<LoggerConfig, 'context'> = {
+  context: {
+    package: '@just-in/engine',
+    version: 'The Full JustIn',
+  },
+};
 
 /**
  * JustInWrapper class provides a unified interface for managing application-level configurations,
@@ -35,10 +47,12 @@ import { setDecisionRuleResultRecorder, setTaskResultRecorder } from "./handlers
 export class JustInWrapper {
   protected static instance: JustInWrapper | null = null;
   private dataManager: DataManager = DataManager.getInstance();
-  private eventHandlerManager: EventHandlerManager = EventHandlerManager.getInstance();
-  private isInitialized: boolean = false;
+  private eventHandlerManager: EventHandlerManager =
+    EventHandlerManager.getInstance();
+  private isInitialized = false;
   private initializedAt: Date | null = null;
-  private intervalTimerEventGenerators: Map<string, IntervalTimerEventGenerator> = new Map();
+  private intervalTimerEventGenerators: Map<string, IntervalTimerEventGenerator> =
+    new Map();
 
   protected constructor() {
     this.isInitialized = false;
@@ -83,12 +97,14 @@ export class JustInWrapper {
     if (this.getInitializationStatus()) {
       Log.warn('JustInWrapper is already initialized.');
       return;
-      }
+    }
+
     await this.dataManager.init(dbType);
     await UserManager.init();
     this.isInitialized = true;
-    Log.info('JustIn initialized successfully.');
+    Log.info('JustIn initialized successfully.', { dbType });
   }
+
   /**
    * Shuts down data manager, user manager, and event queue.
    * Clears all interval timer event generators and event handlers.
@@ -109,7 +125,7 @@ export class JustInWrapper {
       this.initializedAt = null;
       Log.info('JustIn shut down successfully.');
     } catch (error) {
-      Log.warn('Error shutting down JustInWrapper:', error);
+      Log.warn('Error shutting down JustInWrapper.', { error });
     }
   }
 
@@ -118,17 +134,23 @@ export class JustInWrapper {
    * This should be called after init().
    */
   public async startEngine(): Promise<void> {
-    Log.dev('Starting engine...');
+    Log.debug('Starting engine...');
 
     await startEventQueueProcessing();
 
-    this.intervalTimerEventGenerators.forEach((eventGenerator, eventTypeName) => {
-      Log.info(`Starting interval timer event generator for event type: ${eventTypeName}`);
-      eventGenerator.start();
-    });
+    this.intervalTimerEventGenerators.forEach(
+      (eventGenerator, eventTypeName) => {
+        Log.info('Starting interval timer event generator.', {
+          eventTypeName,
+        });
+        eventGenerator.start();
+      },
+    );
 
     await processEventQueue();
-    Log.info(`Engine started and processing events at ${new Date().toISOString()}.`);
+    Log.info('Engine started and processing events.', {
+      startedAt: new Date().toISOString(),
+    });
   }
 
   /**
@@ -136,10 +158,14 @@ export class JustInWrapper {
    * This can be called to stop the engine without shutting down the application.
    */
   public async stopEngine(): Promise<void> {
-    this.intervalTimerEventGenerators.forEach((eventGenerator, eventTypeName) => {
-      Log.info(`Stopping interval timer event generator for event type: ${eventTypeName}`);
-      eventGenerator.stop();
-    });
+    this.intervalTimerEventGenerators.forEach(
+      (eventGenerator, eventTypeName) => {
+        Log.info('Stopping interval timer event generator.', {
+          eventTypeName,
+        });
+        eventGenerator.stop();
+      },
+    );
     stopEventQueueProcessing();
     Log.info('Engine stopped and cleared of all events.');
   }
@@ -149,8 +175,8 @@ export class JustInWrapper {
    * @param {NewUserRecord[]} users - The list of new users to add.
    * @returns {Promise<(JUser | null)[]>} The list of added users, or null if not found.
    */
-  public async addUsers(users: NewUserRecord[]) : Promise<(JUser | null)[]> {
-    return await UserManager.addUsers(users);
+  public async addUsers(users: NewUserRecord[]): Promise<(JUser | null)[]> {
+    return UserManager.addUsers(users);
   }
 
   /**
@@ -158,16 +184,16 @@ export class JustInWrapper {
    * @returns {Promise<(JUser | null)[]>} The list of users, or null if not found.
    */
   public async getAllUsers(): Promise<(JUser | null)[]> {
-    return await UserManager.getAllUsers();
+    return UserManager.getAllUsers();
   }
 
   /**
    * Adds a new user to the database.
    * @param {NewUserRecord} newUserRecord - The new user record to add.
-   * @returns {Promise<JUser>} The added user.
+   * @returns {Promise<JUser | null>} The added user.
    */
   public async addUser(newUserRecord: NewUserRecord): Promise<JUser | null> {
-    return await UserManager.addUser(newUserRecord);
+    return UserManager.addUser(newUserRecord);
   }
 
   /**
@@ -176,26 +202,32 @@ export class JustInWrapper {
    * @returns {Promise<JUser | null>} The user, or null if not found.
    */
   public async getUser(uniqueIdentifier: string): Promise<JUser | null> {
-    return await UserManager.getUserByUniqueIdentifier(uniqueIdentifier);
+    return UserManager.getUserByUniqueIdentifier(uniqueIdentifier);
   }
 
   /**
-   * Retrieves a user from the database by their unique identifier.
+   * Updates a user in the database by their unique identifier.
    * @param {string} uniqueIdentifier - The unique identifier of the user.
    * @param {Record<string, any>} attributesToUpdate - The attributes to update in the user record.
    * @returns {Promise<JUser | null>} The user, or null if not found.
    */
-  public async updateUser(uniqueIdentifier: string, attributesToUpdate: Record<string, any>): Promise<JUser | null> {
-    return await UserManager.updateUserByUniqueIdentifier(uniqueIdentifier, attributesToUpdate);
+  public async updateUser(
+    uniqueIdentifier: string,
+    attributesToUpdate: Record<string, any>,
+  ): Promise<JUser | null> {
+    return UserManager.updateUserByUniqueIdentifier(
+      uniqueIdentifier,
+      attributesToUpdate,
+    );
   }
 
-    /**
+  /**
    * Deletes a user from the database by their unique identifier.
    * @param {string} uniqueIdentifier - The unique identifier of the user.
-   * @returns {Promise<void>} A promise that resolves when the user is deleted.
+   * @returns {Promise<boolean>} True if deleted, false otherwise.
    */
   public async deleteUser(uniqueIdentifier: string): Promise<boolean> {
-    return await UserManager.deleteUserByUniqueIdentifier(uniqueIdentifier);
+    return UserManager.deleteUserByUniqueIdentifier(uniqueIdentifier);
   }
 
   /**
@@ -205,7 +237,7 @@ export class JustInWrapper {
    */
   public async registerEventHandlers(
     eventType: string,
-    handlers: string[]
+    handlers: string[],
   ): Promise<void> {
     await this.eventHandlerManager.registerEventHandlers(eventType, handlers);
   }
@@ -224,8 +256,16 @@ export class JustInWrapper {
    * @param {number} intervalInMs - The interval in milliseconds.
    * @param {IntervalTimerEventGeneratorOptions} options - The options for the event generator.
    */
-  public createIntervalTimerEventGenerator(eventTypeName: string, intervalInMs: number, options: IntervalTimerEventGeneratorOptions = {}): void {
-    const eventGenerator = new IntervalTimerEventGenerator(intervalInMs, eventTypeName, options);
+  public createIntervalTimerEventGenerator(
+    eventTypeName: string,
+    intervalInMs: number,
+    options: IntervalTimerEventGeneratorOptions = {},
+  ): void {
+    const eventGenerator = new IntervalTimerEventGenerator(
+      intervalInMs,
+      eventTypeName,
+      options,
+    );
     this.intervalTimerEventGenerators.set(eventTypeName, eventGenerator);
   }
 
@@ -233,7 +273,10 @@ export class JustInWrapper {
    * Returns the interval timer event generators.
    * @returns {Map<string, IntervalTimerEventGenerator>} The interval timer event generators.
    */
-  public getIntervalTimerEventGenerators(): Map<string, IntervalTimerEventGenerator> {
+  public getIntervalTimerEventGenerators(): Map<
+    string,
+    IntervalTimerEventGenerator
+  > {
     return this.intervalTimerEventGenerators;
   }
 
@@ -242,10 +285,12 @@ export class JustInWrapper {
    * @param {string} eventType - The type of the event.
    * @param {Date} generatedTimestamp - The timestamp of the event.
    * @param {object} eventDetails - The details of the event instance.
-   *      NOTE: publishEventDetails expects a Record,
-   *      but I don't think we want to expose this to 3PDs
    */
-  public async publishEvent(eventType: string, generatedTimestamp: Date, eventDetails?: object): Promise<void> {
+  public async publishEvent(
+    eventType: string,
+    generatedTimestamp: Date,
+    eventDetails?: object,
+  ): Promise<void> {
     await publishEvent(eventType, generatedTimestamp, eventDetails);
   }
 
@@ -273,37 +318,51 @@ export class JustInWrapper {
   }
 
   /**
-   * Configures the logger with a custom logger instance.
-   * @param {Logger} logger - The logger implementation to use.
+   * Configure the global logger used by core/engine.
+   * This accepts the LoggerConfig shape from @just-in/core and layers in
+   * a base context for JustInWrapper.
    */
-  public configureLogger(logger: Logger): void {
-    setLogger(logger);
+  public configureLogger(config: LoggerConfig): void {
+    const mergedContext = {
+      ...(baseLoggingContext.context ?? {}),
+      ...(config.context ?? {}),
+    };
+
+    configureCoreLogger({
+      ...config,
+      context: mergedContext,
+    });
   }
 
   /**
    * Configures the writer for a task result with a custom function.
-   * Will default to writing to the db
-   * @param {RecordResultFunction} taskWriter - The function to take in the results of a task
+   * Will default to writing to the DB if not set.
+   * @param {RecordResultFunction} taskWriter - The function to take in the results of a task.
    */
   public configureTaskResultWriter(taskWriter: RecordResultFunction): void {
-    setTaskResultRecorder(taskWriter)
+    setTaskResultRecorder(taskWriter);
   }
 
   /**
    * Configures the writer for a decision rule result with a custom function.
-   * Will default to writing to the db
-   * @param {RecordResultFunction} decisionRuleWriter - The function to take in the results of a task
+   * Will default to writing to the DB if not set.
+   * @param {RecordResultFunction} decisionRuleWriter - The function to take in the results of a decision rule.
    */
-  public configureDecisionRuleResultWriter(decisionRuleWriter: RecordResultFunction): void {
-    setDecisionRuleResultRecorder(decisionRuleWriter)
+  public configureDecisionRuleResultWriter(
+    decisionRuleWriter: RecordResultFunction,
+  ): void {
+    setDecisionRuleResultRecorder(decisionRuleWriter);
   }
 
   /**
-   * Sets the logging levels for the application.
-   * @param levels - The logging levels to enable or disable.
+   * Convenience helper to set the global minimum log level.
+   *
+   * Accepts any severity name (base or custom). For custom severities,
+   * callers should also define a matching `severityRanking` via
+   * `configureLogger` so the logger knows how to order them.
    */
-  public setLoggingLevels(levels: Partial<typeof logLevels>): void {
-    setLogLevels(levels);
+  public setLoggingLevels(level: string): void {
+    configureCoreLogger({ level });
   }
 }
 

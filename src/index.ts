@@ -1,7 +1,8 @@
+// Engine entrypoints
 export { JustInWrapper } from './JustInWrapper';
 export { JustInLite } from './JustInLite';
 
-// Types users need to define their stuff
+// Types
 export type { JEvent } from './event/event.type';
 export type {
   TaskRegistration,
@@ -10,11 +11,20 @@ export type {
   ExecuteStepReturn,
 } from './handlers/handler.type';
 
-
-/** Core logger utilities, re-exported for convenience. */
-export { Log, setLogger, setLogLevels, logLevels, scopedLog } from "@just-in/core";
-export type { Logger } from "@just-in/core";
+/**
+ * Core logger utilities, re-exported for convenience so 3PDs don't have
+ * to depend on @just-in/core directly if they don't want to.
+ */
+export { createLogger, configureLogger } from '@just-in/core';
+export type {
+  Logger,
+  LoggerEntry,
+  BaseSeverity,
+  LoggerCallback,
+  EmitFn,
+  LoggerConfig,
+} from '@just-in/core';
 
 /** User APIs commonly needed by event-driven apps. */
-export { UserManager } from "@just-in/core";
-export type { JUser, NewUserRecord } from "@just-in/core";
+export { UserManager } from '@just-in/core';
+export type { JUser, NewUserRecord } from '@just-in/core';

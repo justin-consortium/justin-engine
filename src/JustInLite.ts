@@ -1,4 +1,12 @@
-import {JUser, NewUserRecord, Logger, logLevels, setLogLevels, setLogger, Log } from '@just-in/core';
+import {
+  JUser,
+  NewUserRecord,
+  configureLogger as configureCoreLogger,
+  createLogger,
+  type Logger,
+  type LoggerConfig,
+  type BaseSeverity,
+} from '@just-in/core';
 import { EventHandlerManager } from './event/event-handler-manager';
 import { registerTask as coreRegisterTask } from './handlers/task.manager';
 import { registerDecisionRule as coreRegisterDecisionRule } from './handlers/decision-rule.manager';
@@ -15,6 +23,21 @@ import {
   setTaskResultRecorder,
   setResultRecorderPersistenceEnabled,
 } from './handlers/result-recorder';
+
+const baseGlobalLoggingContext: Pick<LoggerConfig, 'context'> = {
+  context: {
+    package: '@just-in/engine',
+    version: 'JustInLite',
+  },
+};
+
+// local logger instance for JustInLite internals
+const Log: Logger<BaseSeverity> = createLogger<BaseSeverity>({
+  context: {
+    package: '@just-in/engine',
+    component: 'JustInLiteWrapper',
+  },
+});
 
 /**
  * JustInLiteWrapper provides a minimal, serverless-oriented interface for 3rd-party apps:
@@ -78,7 +101,6 @@ export class JustInLiteWrapper {
     EventHandlerManager.getInstance().clearEventHandlers();
   }
 
-
   // ────────────────────────────────────────────────────────────────────────────
   // Users (in-memory)
   // ────────────────────────────────────────────────────────────────────────────
@@ -101,11 +123,13 @@ export class JustInLiteWrapper {
       const anyItem = item as any;
 
       const uniqueIdentifier =
-        typeof anyItem?.uniqueIdentifier === 'string' ? anyItem.uniqueIdentifier.trim() : '';
+        typeof anyItem?.uniqueIdentifier === 'string'
+          ? anyItem.uniqueIdentifier.trim()
+          : '';
       const idHint = typeof anyItem?.id === 'string' ? anyItem.id : undefined;
 
       if (!uniqueIdentifier) {
-        const msg = `UniqueIdentifier is missing`
+        const msg = `UniqueIdentifier is missing`;
         Log.error(msg);
         throw new Error(msg);
       }
@@ -117,9 +141,11 @@ export class JustInLiteWrapper {
       }
 
       const attrs =
-        'attributes' in anyItem ? (anyItem.attributes ?? {}) :
-          'initialAttributes' in anyItem ? (anyItem.initialAttributes ?? {}) :
-            {};
+        'attributes' in anyItem
+          ? anyItem.attributes ?? {}
+          : 'initialAttributes' in anyItem
+            ? anyItem.initialAttributes ?? {}
+            : {};
 
       const ju: JUser = {
         id: idHint ?? uniqueIdentifier,
@@ -132,7 +158,9 @@ export class JustInLiteWrapper {
     });
 
     this.users = next;
-    Log.info(`JustInLite: loaded ${next.size} users (in-memory, replacing previous set).`);
+    Log.info(
+      `JustInLite: loaded ${next.size} users (in-memory, replacing previous set).`,
+    );
     return normalized;
   }
 
@@ -146,7 +174,9 @@ export class JustInLiteWrapper {
   }
 
   /** Register a Decision Rule. */
-  public registerDecisionRule(decisionRule: DecisionRuleRegistration): void {
+  public registerDecisionRule(
+    decisionRule: DecisionRuleRegistration,
+  ): void {
     coreRegisterDecisionRule(decisionRule);
   }
 
@@ -161,14 +191,16 @@ export class JustInLiteWrapper {
     eventType: string,
     handlers: string[],
   ): Promise<void> {
-    await this.eventHandlerManager.registerEventHandlers(eventType, handlers);
+    await this.eventHandlerManager.registerEventHandlers(
+      eventType,
+      handlers,
+    );
   }
 
   /** Unregister handlers for an event type. */
   public unregisterEventHandlers(eventType: string): void {
     this.eventHandlerManager.unregisterEventHandlers(eventType);
   }
-
 
   // ────────────────────────────────────────────────────────────────────────────
   // Execution
@@ -187,25 +219,31 @@ export class JustInLiteWrapper {
     eventType: string,
     generatedTimestamp: Date,
     eventDetails?: object,
-    idempotencyKey?: string
+    idempotencyKey?: string,
   ): Promise<void> {
     // Optional in-memory idempotency for cloud runs
     if (idempotencyKey) {
       if (this.processedKeys.has(idempotencyKey)) {
-        Log.warn(`[JustInLite] duplicate execution skipped for key: ${idempotencyKey}`);
+        Log.warn(
+          `[JustInLite] duplicate execution skipped for key: ${idempotencyKey}`,
+        );
         return;
       }
       this.processedKeys.add(idempotencyKey);
     }
 
     if (!this.eventHandlerManager.hasHandlersForEventType(eventType)) {
-      throw new Error(`No handlers registered for event type "${eventType}".`);
+      throw new Error(
+        `No handlers registered for event type "${eventType}".`,
+      );
     }
 
     // Ensure users are loaded
     const users = Array.from(this.users.values());
     if (users.length === 0) {
-      throw new Error('JustInLite.publishEvent called with no users loaded.');
+      throw new Error(
+        'JustInLite.publishEvent called with no users loaded.',
+      );
     }
 
     const event: JEvent = {
@@ -221,20 +259,46 @@ export class JustInLiteWrapper {
   // Logger & Writers (same names as full JustIn)
   // ────────────────────────────────────────────────────────────────────────────
 
-  public configureLogger(logger: Logger): void {
-    setLogger(logger);
+  /**
+   * Configure the global logger used by core/engine.
+   * This accepts the new LoggerConfig shape from @just-in/core.
+   *
+   * We always layer the base JustInLite context on top, and then let callers
+   * add/override fields via `config.context`.
+   */
+  public configureLogger(config: LoggerConfig): void {
+    const mergedContext = {
+      ...(baseGlobalLoggingContext.context ?? {}),
+      ...(config.context ?? {}),
+    };
+
+    configureCoreLogger({
+      ...config,
+      context: mergedContext,
+    });
   }
 
-  public configureTaskResultWriter(taskWriter: RecordResultFunction): void {
+  public configureTaskResultWriter(
+    taskWriter: RecordResultFunction,
+  ): void {
     setTaskResultRecorder(taskWriter);
   }
 
-  public configureDecisionRuleResultWriter(decisionRuleWriter: RecordResultFunction): void {
+  public configureDecisionRuleResultWriter(
+    decisionRuleWriter: RecordResultFunction,
+  ): void {
     setDecisionRuleResultRecorder(decisionRuleWriter);
   }
 
-  public setLoggingLevels(levels: Partial<typeof logLevels>): void {
-    setLogLevels(levels);
+  /**
+   * Convenience helper to set the global minimum log level.
+   *
+   * Accepts any severity name (base or custom). For custom severities,
+   * callers should also define a matching `severityRanking` via
+   * `configureLogger` so the logger knows how to order them.
+   */
+  public setLoggingLevels(level: string): void {
+    configureCoreLogger({ level });
   }
 }
 

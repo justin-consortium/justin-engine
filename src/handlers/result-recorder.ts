@@ -1,23 +1,30 @@
-import DataManager, { Log } from '@just-in/core';
+import DataManager, { createLogger } from '@just-in/core';
 import { RecordResult, RecordResultFunction } from './handler.type';
-import {DECISION_RULE_RESULTS, TASK_RESULTS} from "../constants";
+import { DECISION_RULE_RESULTS, TASK_RESULTS } from '../constants';
 
 let recordDecisionRuleResultFn: RecordResultFunction | null = null;
 let recordTaskResultFn: RecordResultFunction | null = null;
 let _persistenceEnabled = true;
 
+// Lazy cache; do NOT call DataManager.getInstance() unless persistence is enabled.
+let _dm: ReturnType<typeof DataManager.getInstance> | null = null;
+
+const Log = createLogger({
+  context: {
+    component: 'ResultRecorder',
+  },
+});
+
 /**
  * Enable/disable persistence attempts inside the result recorder.
- * When disabled, the recorder will NEVER call DataManager and will console-log instead.
+ * When disabled, the recorder will NEVER call DataManager and will log instead.
  */
 export function setResultRecorderPersistenceEnabled(enabled: boolean): void {
   _persistenceEnabled = enabled;
   _dm = null;
 }
 
-// Lazy cache; do NOT call DataManager.getInstance() unless persistence is enabled.
-let _dm: ReturnType<typeof DataManager.getInstance> | null = null;
-
+// Lazy getter that respects _persistenceEnabled
 function getDataManagerSafe() {
   if (!_persistenceEnabled) return null;
   if (_dm) return _dm;
@@ -50,7 +57,7 @@ export function setTaskResultRecorder(fn: RecordResultFunction): void {
 async function persistOrLog(
   collection: string,
   record: RecordResult,
-  kind: 'task' | 'decision'
+  kind: 'task' | 'decision',
 ): Promise<void> {
   try {
     const dm = getDataManagerSafe();
@@ -58,10 +65,19 @@ async function persistOrLog(
       await dm.addItemToCollection(collection, record);
       return;
     }
-  } catch (e) {
-    Log.warn('Result recorder DataManager path failed; falling back to Log.dev.', e);
+  } catch (error) {
+    Log.warn('Result recorder DataManager path failed; falling back to debug log.', {
+      collection,
+      kind,
+      error,
+    });
   }
-  Log.dev(`[ResultRecorder:${kind}]`, record);
+
+  Log.debug('[ResultRecorder:fallback]', {
+    collection,
+    kind,
+    record,
+  });
 }
 
 /**
@@ -74,8 +90,11 @@ export async function handleDecisionRuleResult(record: RecordResult): Promise<vo
     try {
       await recordDecisionRuleResultFn(record);
       return;
-    } catch (e) {
-      Log.warn('Decision rule result recorder failed; falling back to default.', e);
+    } catch (error) {
+      Log.warn('Decision rule result recorder failed; falling back to default.', {
+        record,
+        error,
+      });
     }
   }
 
@@ -92,15 +111,21 @@ export async function handleTaskResult(record: RecordResult): Promise<void> {
     try {
       await recordTaskResultFn(record);
       return;
-    } catch (e) {
-      Log.warn('Task result recorder failed; falling back to default.', e);
+    } catch (error) {
+      Log.warn('Task result recorder failed; falling back to default.', {
+        record,
+        error,
+      });
     }
   } else if (recordDecisionRuleResultFn) {
     try {
       await recordDecisionRuleResultFn(record);
       return; // success → skip fallback
-    } catch (e) {
-      Log.warn('Delegated decision rule recorder failed; falling back to default.', e);
+    } catch (error) {
+      Log.warn('Delegated decision rule recorder failed; falling back to default.', {
+        record,
+        error,
+      });
     }
   }
 
@@ -111,7 +136,6 @@ export async function handleTaskResult(record: RecordResult): Promise<void> {
 export function hasResultRecord(record: RecordResult): boolean {
   return record.steps.length > 0;
 }
-
 
 export function __resetResultRecorderForTests(): void {
   recordDecisionRuleResultFn = null;

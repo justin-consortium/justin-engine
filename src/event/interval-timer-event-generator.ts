@@ -1,4 +1,4 @@
-import { IntervalTimerEventGeneratorOptions, JEvent } from "./event.type";
+import { IntervalTimerEventGeneratorOptions } from "./event.type";
 import { publishEvent } from "./event-queue";
 
 export class IntervalTimerEventGenerator {
@@ -11,7 +11,7 @@ export class IntervalTimerEventGenerator {
   private simulatedTickCount: number = 0;
 
   constructor(
-    private readonly intervalInMs: number, 
+    private readonly intervalInMs: number,
     private readonly eventTypeName: string,
     private readonly options: IntervalTimerEventGeneratorOptions = {}
   ) {
@@ -33,14 +33,14 @@ export class IntervalTimerEventGenerator {
 
   public start(): void {
     const startDate = new Date();
-    const timerInterval = 
+    const timerInterval =
       this.useSimulatedStartDate ? this.simulatedTickDurationInMs : this.intervalInMs;
     this.intervalId = setInterval(() => {
       let eventTimestamp: Date;
       if (this.useSimulatedStartDate) {
         eventTimestamp = new Date(
-          this.simulatedStartDate!.getTime() 
-          + this.simulatedTickCount 
+          this.simulatedStartDate!.getTime()
+          + this.simulatedTickCount
           * this.intervalInMs);
         this.simulatedTickCount++;
         if (this.simulatedTickCountMax && this.simulatedTickCount >= this.simulatedTickCountMax) {
