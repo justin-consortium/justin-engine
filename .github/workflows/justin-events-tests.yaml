@@ -1,4 +1,4 @@
-name: Run justin-events Tests
+name: Run justin-engine Tests
 
 on:
   push:
@@ -10,7 +10,7 @@ on:
 
 jobs:
   test:
-    name: Run justin-events Tests
+    name: Run justin-engine Tests
     runs-on: ubuntu-latest
 
     steps:
