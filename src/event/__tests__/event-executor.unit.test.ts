@@ -63,7 +63,9 @@ describe('executeEventForUsers', () => {
       await executeEventForUsers(event, users, handlerManager);
 
       expect(getHandlersForEventTypeStub.calledWith('TEST_EVENT')).toBe(true);
-      expect(logWarnStub.calledWith('No handlers registered for event type "TEST_EVENT".')).toBe(true);
+      expect(logWarnStub.calledWith('No handlers registered for event type "TEST_EVENT".')).toBe(
+        true,
+      );
       expect(getTaskByNameStub.called).toBe(false);
       expect(getDecisionRuleByNameStub.called).toBe(false);
       expect(executeTaskStub.called).toBe(false);
@@ -116,9 +118,11 @@ describe('executeEventForUsers', () => {
       await executeEventForUsers(event, users, handlerManager);
 
       expect(beforeStub.calledOnceWith(event)).toBe(true);
-      expect(logErrorStub.calledWith(
-        'beforeExecution error for "taskA" on event "TEST_EVENT": Error: boom-before'
-      )).toBe(true);
+      expect(
+        logErrorStub.calledWith(
+          'beforeExecution error for "taskA" on event "TEST_EVENT": Error: boom-before',
+        ),
+      ).toBe(true);
       expect(executeTaskStub.calledTwice).toBe(true);
       expect(afterStub.calledOnceWith(event)).toBe(true);
     });
@@ -136,9 +140,11 @@ describe('executeEventForUsers', () => {
       await executeEventForUsers(event, users, handlerManager);
 
       expect(executeTaskStub.calledTwice).toBe(true);
-      expect(logErrorStub.calledWith(
-        'Execution error for "taskA" on user "u1" (event "TEST_EVENT"): Error: u1-fail'
-      )).toBe(true);
+      expect(
+        logErrorStub.calledWith(
+          'Execution error for "taskA" on user "u1" (event "TEST_EVENT"): Error: u1-fail',
+        ),
+      ).toBe(true);
     });
 
     it('logs afterExecution error and completes', async () => {
@@ -160,9 +166,11 @@ describe('executeEventForUsers', () => {
       await executeEventForUsers(event, users, handlerManager);
 
       expect(afterStub.calledOnceWith(event)).toBe(true);
-      expect(logErrorStub.calledWith(
-        'afterExecution error for "taskA" on event "TEST_EVENT": Error: boom-after'
-      )).toBe(true);
+      expect(
+        logErrorStub.calledWith(
+          'afterExecution error for "taskA" on event "TEST_EVENT": Error: boom-after',
+        ),
+      ).toBe(true);
     });
   });
 
@@ -206,9 +214,11 @@ describe('executeEventForUsers', () => {
       await executeEventForUsers(event, users, handlerManager);
 
       expect(executeDecisionRuleStub.calledTwice).toBe(true);
-      expect(logErrorStub.calledWith(
-        'Execution error for "ruleA" on user "u1" (event "TEST_EVENT"): Error: u1-fail'
-      )).toBe(true);
+      expect(
+        logErrorStub.calledWith(
+          'Execution error for "ruleA" on user "u1" (event "TEST_EVENT"): Error: u1-fail',
+        ),
+      ).toBe(true);
     });
 
     it('logs lifecycle errors and continues', async () => {
@@ -230,16 +240,20 @@ describe('executeEventForUsers', () => {
       await executeEventForUsers(event, users, handlerManager);
 
       expect(beforeStub.calledOnceWith(event)).toBe(true);
-      expect(logErrorStub.calledWith(
-        'beforeExecution error for "ruleA" on event "TEST_EVENT": Error: boom-before'
-      )).toBe(true);
+      expect(
+        logErrorStub.calledWith(
+          'beforeExecution error for "ruleA" on event "TEST_EVENT": Error: boom-before',
+        ),
+      ).toBe(true);
 
       expect(executeDecisionRuleStub.calledTwice).toBe(true);
 
       expect(afterStub.calledOnceWith(event)).toBe(true);
-      expect(logErrorStub.calledWith(
-        'afterExecution error for "ruleA" on event "TEST_EVENT": Error: boom-after'
-      )).toBe(true);
+      expect(
+        logErrorStub.calledWith(
+          'afterExecution error for "ruleA" on event "TEST_EVENT": Error: boom-after',
+        ),
+      ).toBe(true);
     });
   });
 

@@ -57,9 +57,7 @@ describe('JustInLite', () => {
 
   describe('loadUsers', () => {
     it('loads JUser[] and replaces previous set', async () => {
-      const users1: JUser[] = [
-        { id: 'a', uniqueIdentifier: 'a', attributes: { n: 1 } } as JUser,
-      ];
+      const users1: JUser[] = [{ id: 'a', uniqueIdentifier: 'a', attributes: { n: 1 } } as JUser];
       const users2: JUser[] = [
         { id: 'b', uniqueIdentifier: 'b', attributes: { n: 2 } } as JUser,
         { id: 'c', uniqueIdentifier: 'c', attributes: { n: 3 } } as JUser,
@@ -90,9 +88,9 @@ describe('JustInLite', () => {
 
     it('throws on missing uniqueIdentifier', async () => {
       await expect(
-        lite.loadUsers([{ id: 'no-uid', attributes: {} } as unknown as JUser])
-      ).rejects.toThrow("UniqueIdentifier is missing");
-      expect(logErrorStub.calledWithMatch("UniqueIdentifier is missing")).toBe(true);
+        lite.loadUsers([{ id: 'no-uid', attributes: {} } as unknown as JUser]),
+      ).rejects.toThrow('UniqueIdentifier is missing');
+      expect(logErrorStub.calledWithMatch('UniqueIdentifier is missing')).toBe(true);
     });
 
     it('throws on duplicate uniqueIdentifier in same call', async () => {
@@ -100,22 +98,22 @@ describe('JustInLite', () => {
         lite.loadUsers([
           { id: 'x', uniqueIdentifier: 'dup', attributes: {} } as JUser,
           { id: 'y', uniqueIdentifier: 'dup', attributes: {} } as JUser,
-        ])
+        ]),
       ).rejects.toThrow('duplicate uniqueIdentifier "dup"');
       expect(logErrorStub.calledWithMatch('duplicate uniqueIdentifier "dup"')).toBe(true);
     });
     it('should not throw an error if loadUsers is called twice with same uniqueIdentifier', async () => {
-        const loadedUsers = await lite.loadUsers([
-          { id: 'x', uniqueIdentifier: 'identifier-x', attributes: {} } as JUser,
-          { id: 'y', uniqueIdentifier: 'identifier-y', attributes: {} } as JUser,
-        ])
+      const loadedUsers = await lite.loadUsers([
+        { id: 'x', uniqueIdentifier: 'identifier-x', attributes: {} } as JUser,
+        { id: 'y', uniqueIdentifier: 'identifier-y', attributes: {} } as JUser,
+      ]);
       expect(loadedUsers.length).toBe(2);
       expect(loadedUsers[0]?.uniqueIdentifier).toBe('identifier-x');
       expect(loadedUsers[1]?.uniqueIdentifier).toBe('identifier-y');
 
       const reLoadedUsers = await lite.loadUsers([
-        { id: 'x', uniqueIdentifier: 'identifier-x', attributes: {} } as JUser
-        ])
+        { id: 'x', uniqueIdentifier: 'identifier-x', attributes: {} } as JUser,
+      ]);
       expect(reLoadedUsers.length).toBe(1);
       expect(loadedUsers[0]?.uniqueIdentifier).toBe('identifier-x');
     });
@@ -156,7 +154,9 @@ describe('JustInLite', () => {
       await lite.publishEvent('E1', ts, {}, 'dup-key');
 
       expect(executeEventForUsersStub.calledOnce).toBe(true);
-      expect(logWarnStub.calledWithMatch('duplicate execution skipped for key: dup-key')).toBe(true);
+      expect(logWarnStub.calledWithMatch('duplicate execution skipped for key: dup-key')).toBe(
+        true,
+      );
     });
 
     it('throws when no users loaded', async () => {

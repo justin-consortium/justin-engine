@@ -1,12 +1,10 @@
 import sinon from 'sinon';
-import { LoggerMocksType } from '../../__tests__/mocks/logger.mock';
+import { JUser } from '@just-in/core';
+import { LoggerMocksType, initializeLoggerMocks } from '../../__tests__/mocks/logger.mock';
 import { Task, TaskStep, HandlerType, TaskRegistration } from '../../handlers/handler.type';
 import { JEvent } from '../../event/event.type';
-import { JUser } from '../../user-manager/user.type';
-import { initializeLoggerMocks } from '../../__tests__/mocks/logger.mock';
-import { registerTask, getTaskByName } from '../../handlers/task.manager';
+import { registerTask, getTaskByName, executeTask } from '../../handlers/task.manager';
 import { executeStep } from '../../handlers/steps.helpers';
-import { executeTask } from '../../handlers/task.manager';
 import { handleTaskResult } from '../result-recorder';
 
 jest.mock('../steps.helpers', () => ({
@@ -36,8 +34,8 @@ describe('Task Manager', () => {
     id: 'user123',
     uniqueIdentifier: 'user123',
     attributes: {
-      preferredName: 'Test User'
-    }
+      preferredName: 'Test User',
+    },
   };
 
   beforeEach(() => {
@@ -68,7 +66,7 @@ describe('Task Manager', () => {
 
     sinon.assert.calledOnceWithExactly(
       loggerMocks.mockLogInfo,
-      'Task "testTask" registered successfully.'
+      'Task "testTask" registered successfully.',
     );
   });
 
@@ -106,12 +104,12 @@ describe('Task Manager', () => {
 
       sinon.assert.calledWithExactly(
         loggerMocks.mockLogInfo,
-        `Executing task "mockTask" for user "user123" in event "MOCK_EVENT".`
+        `Executing task "mockTask" for user "user123" in event "MOCK_EVENT".`,
       );
 
       sinon.assert.calledWithExactly(
         loggerMocks.mockLogInfo,
-        `Completed execution of task "mockTask" for user "user123".`
+        `Completed execution of task "mockTask" for user "user123".`,
       );
 
       expect(handleTaskResult).toHaveBeenCalledWith({
@@ -132,7 +130,7 @@ describe('Task Manager', () => {
 
       sinon.assert.calledWithExactly(
         loggerMocks.mockLogError,
-        `Error executing task "mockTask" for user "user123": Error: Test error`
+        `Error executing task "mockTask" for user "user123": Error: Test error`,
       );
 
       expect(handleTaskResult).toHaveBeenCalledTimes(1);

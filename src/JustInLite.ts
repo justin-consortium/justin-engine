@@ -51,8 +51,7 @@ export class JustInLiteWrapper {
 
   /** In-memory idempotency (per warm instance only). */
   private processedKeys = new Set<string>();
-  private eventHandlerManager: EventHandlerManager =
-    EventHandlerManager.getInstance();
+  private eventHandlerManager: EventHandlerManager = EventHandlerManager.getInstance();
 
   /** In-memory users for this warm instance (keyed by uniqueIdentifier). */
   private users: Map<string, JUser> = new Map();
@@ -123,9 +122,7 @@ export class JustInLiteWrapper {
       const anyItem = item as any;
 
       const uniqueIdentifier =
-        typeof anyItem?.uniqueIdentifier === 'string'
-          ? anyItem.uniqueIdentifier.trim()
-          : '';
+        typeof anyItem?.uniqueIdentifier === 'string' ? anyItem.uniqueIdentifier.trim() : '';
       const idHint = typeof anyItem?.id === 'string' ? anyItem.id : undefined;
 
       if (!uniqueIdentifier) {
@@ -142,9 +139,9 @@ export class JustInLiteWrapper {
 
       const attrs =
         'attributes' in anyItem
-          ? anyItem.attributes ?? {}
+          ? (anyItem.attributes ?? {})
           : 'initialAttributes' in anyItem
-            ? anyItem.initialAttributes ?? {}
+            ? (anyItem.initialAttributes ?? {})
             : {};
 
       const ju: JUser = {
@@ -158,9 +155,7 @@ export class JustInLiteWrapper {
     });
 
     this.users = next;
-    Log.info(
-      `JustInLite: loaded ${next.size} users (in-memory, replacing previous set).`,
-    );
+    Log.info(`JustInLite: loaded ${next.size} users (in-memory, replacing previous set).`);
     return normalized;
   }
 
@@ -174,9 +169,7 @@ export class JustInLiteWrapper {
   }
 
   /** Register a Decision Rule. */
-  public registerDecisionRule(
-    decisionRule: DecisionRuleRegistration,
-  ): void {
+  public registerDecisionRule(decisionRule: DecisionRuleRegistration): void {
     coreRegisterDecisionRule(decisionRule);
   }
 
@@ -187,14 +180,8 @@ export class JustInLiteWrapper {
    * @param eventType - The type of the event.
    * @param handlers - Ordered task/decision-rule names for the event.
    */
-  public async registerEventHandlers(
-    eventType: string,
-    handlers: string[],
-  ): Promise<void> {
-    await this.eventHandlerManager.registerEventHandlers(
-      eventType,
-      handlers,
-    );
+  public async registerEventHandlers(eventType: string, handlers: string[]): Promise<void> {
+    await this.eventHandlerManager.registerEventHandlers(eventType, handlers);
   }
 
   /** Unregister handlers for an event type. */
@@ -224,26 +211,20 @@ export class JustInLiteWrapper {
     // Optional in-memory idempotency for cloud runs
     if (idempotencyKey) {
       if (this.processedKeys.has(idempotencyKey)) {
-        Log.warn(
-          `[JustInLite] duplicate execution skipped for key: ${idempotencyKey}`,
-        );
+        Log.warn(`[JustInLite] duplicate execution skipped for key: ${idempotencyKey}`);
         return;
       }
       this.processedKeys.add(idempotencyKey);
     }
 
     if (!this.eventHandlerManager.hasHandlersForEventType(eventType)) {
-      throw new Error(
-        `No handlers registered for event type "${eventType}".`,
-      );
+      throw new Error(`No handlers registered for event type "${eventType}".`);
     }
 
     // Ensure users are loaded
     const users = Array.from(this.users.values());
     if (users.length === 0) {
-      throw new Error(
-        'JustInLite.publishEvent called with no users loaded.',
-      );
+      throw new Error('JustInLite.publishEvent called with no users loaded.');
     }
 
     const event: JEvent = {
@@ -278,15 +259,11 @@ export class JustInLiteWrapper {
     });
   }
 
-  public configureTaskResultWriter(
-    taskWriter: RecordResultFunction,
-  ): void {
+  public configureTaskResultWriter(taskWriter: RecordResultFunction): void {
     setTaskResultRecorder(taskWriter);
   }
 
-  public configureDecisionRuleResultWriter(
-    decisionRuleWriter: RecordResultFunction,
-  ): void {
+  public configureDecisionRuleResultWriter(decisionRuleWriter: RecordResultFunction): void {
     setDecisionRuleResultRecorder(decisionRuleWriter);
   }
 

@@ -1,8 +1,4 @@
-import {
-  createLogger,
-  type Logger,
-  type BaseSeverity,
-} from '@just-in/core';
+import { createLogger } from '@just-in/core';
 
 const Log = createLogger({
   context: {
@@ -10,7 +6,7 @@ const Log = createLogger({
   },
 });
 
-export class EventHandlerManager {
+class EventHandlerManager {
   private handlerMap: Map<string, string[]>;
   private static instance: EventHandlerManager | null = null;
 
@@ -82,10 +78,7 @@ export class EventHandlerManager {
    * @param {string[]} handlerNames - The list of handlers.
    * @throws {Error} If the eventType or handlers are invalid.
    */
-  private validateEventHandlerParams = (
-    eventType: string,
-    handlerNames: string[],
-  ): void => {
+  private validateEventHandlerParams = (eventType: string, handlerNames: string[]): void => {
     if (!eventType || typeof eventType !== 'string') {
       Log.error('Invalid event type.', { eventType });
       throw new Error('Event name must be a non-empty string.');
@@ -137,3 +130,5 @@ export class EventHandlerManager {
     });
   };
 }
+
+export { EventHandlerManager };

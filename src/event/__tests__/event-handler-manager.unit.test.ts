@@ -1,7 +1,10 @@
 import sinon from 'sinon';
 import { initializeLoggerMocks } from '../../__tests__/mocks/logger.mock';
 import { LoggerMocksType } from '../../__tests__/mocks/logger.mock';
-import { initializeDataManagerMock, DataManagerMocksType } from '../../__tests__/mocks/data-manager.mock';
+import {
+  initializeDataManagerMock,
+  DataManagerMocksType,
+} from '../../__tests__/mocks/data-manager.mock';
 import { EventHandlerManager } from '../event-handler-manager';
 
 jest.mock('../event-queue', () => ({
@@ -38,7 +41,7 @@ describe('EventHandlerManager', () => {
     it('should return the same instance when called multiple times', () => {
       const instance1 = EventHandlerManager.getInstance();
       const instance2 = EventHandlerManager.getInstance();
-      
+
       expect(instance1).toBe(instance2);
       expect(instance1).toBeInstanceOf(EventHandlerManager);
     });
@@ -46,10 +49,10 @@ describe('EventHandlerManager', () => {
     it('should create a new instance only on first call', () => {
       // Reset instance
       (EventHandlerManager as any).instance = null;
-      
+
       const instance1 = EventHandlerManager.getInstance();
       const instance2 = EventHandlerManager.getInstance();
-      
+
       expect(instance1).toBe(instance2);
     });
   });
@@ -63,10 +66,10 @@ describe('EventHandlerManager', () => {
 
       expect(eventHandlerManager.hasHandlersForEventType(eventType)).toBe(true);
       expect(eventHandlerManager.getHandlersForEventType(eventType)).toEqual(handlerNames);
-      
+
       sinon.assert.calledWith(
         loggerMocks.mockLogInfo,
-        `Event "${eventType}" registered with handlers: ${handlerNames} and added to the event registry.`
+        `Event "${eventType}" registered with handlers: ${handlerNames} and added to the event registry.`,
       );
     });
 
@@ -79,26 +82,26 @@ describe('EventHandlerManager', () => {
 
       // Try to register again
       await expect(
-        eventHandlerManager.registerEventHandlers(eventType, handlerNames)
+        eventHandlerManager.registerEventHandlers(eventType, handlerNames),
       ).rejects.toThrow(`Event "${eventType}" already registered.`);
 
       sinon.assert.calledWith(
         loggerMocks.mockLogError,
-        `Event registration failed.Event "${eventType}" already registered.`
+        `Event registration failed.Event "${eventType}" already registered.`,
       );
     });
 
     it('should throw error for invalid event type', async () => {
       const invalidEventTypes = ['', null, undefined, 123, {}];
-      
+
       for (const invalidEventType of invalidEventTypes) {
         await expect(
-          eventHandlerManager.registerEventHandlers(invalidEventType as any, ['handler1'])
+          eventHandlerManager.registerEventHandlers(invalidEventType as any, ['handler1']),
         ).rejects.toThrow('Event name must be a non-empty string.');
       }
     });
 
-  it('should throw error for invalid handler names', async () => {
+    it('should throw error for invalid handler names', async () => {
       const eventType = 'TEST_EVENT';
       const invalidHandlerNamesList = [
         [], // empty array
@@ -114,30 +117,23 @@ describe('EventHandlerManager', () => {
 
       for (const invalidHandlerNames of invalidHandlerNamesList) {
         await expect(
-          eventHandlerManager.registerEventHandlers(eventType, invalidHandlerNames as any)
+          eventHandlerManager.registerEventHandlers(eventType, invalidHandlerNames as any),
         ).rejects.toThrow('Handler names must be a non-empty array of strings.');
       }
     });
 
     it('should log error for invalid event type', async () => {
-      await expect(
-        eventHandlerManager.registerEventHandlers('', ['handler1'])
-      ).rejects.toThrow();
+      await expect(eventHandlerManager.registerEventHandlers('', ['handler1'])).rejects.toThrow();
 
-      sinon.assert.calledWith(
-        loggerMocks.mockLogError,
-        'Invalid event type: ""'
-      );
+      sinon.assert.calledWith(loggerMocks.mockLogError, 'Invalid event type: ""');
     });
 
     it('should log error for invalid handler names', async () => {
-      await expect(
-        eventHandlerManager.registerEventHandlers('TEST_EVENT', [])
-      ).rejects.toThrow();
+      await expect(eventHandlerManager.registerEventHandlers('TEST_EVENT', [])).rejects.toThrow();
 
       sinon.assert.calledWith(
         loggerMocks.mockLogError,
-        'Invalid handler names for event "TEST_EVENT": '
+        'Invalid handler names for event "TEST_EVENT": ',
       );
     });
   });
@@ -155,10 +151,7 @@ describe('EventHandlerManager', () => {
       eventHandlerManager.unregisterEventHandlers(eventType);
       expect(eventHandlerManager.hasHandlersForEventType(eventType)).toBe(false);
 
-      sinon.assert.calledWith(
-        loggerMocks.mockLogInfo,
-        `Event "${eventType}" unregistered.`
-      );
+      sinon.assert.calledWith(loggerMocks.mockLogInfo, `Event "${eventType}" unregistered.`);
     });
 
     it('should warn when unregistering non-existent event', () => {
@@ -168,7 +161,7 @@ describe('EventHandlerManager', () => {
 
       sinon.assert.calledWith(
         loggerMocks.mockLogWarn,
-        `Unregister event failed. Event "${nonExistentEvent}" not found in the event registry.`
+        `Unregister event failed. Event "${nonExistentEvent}" not found in the event registry.`,
       );
     });
 
@@ -199,7 +192,7 @@ describe('EventHandlerManager', () => {
 
       sinon.assert.calledWith(
         loggerMocks.mockLogError,
-        `No handlers found for event type "${nonExistentEvent}".`
+        `No handlers found for event type "${nonExistentEvent}".`,
       );
     });
 
@@ -209,7 +202,7 @@ describe('EventHandlerManager', () => {
 
       // This should fail validation, but let's test the edge case
       await expect(
-        eventHandlerManager.registerEventHandlers(eventType, handlerNames)
+        eventHandlerManager.registerEventHandlers(eventType, handlerNames),
       ).rejects.toThrow();
     });
   });
@@ -264,14 +257,21 @@ describe('EventHandlerManager', () => {
       expect(eventHandlerManager.hasHandlersForEventType('EVENT_3')).toBe(true);
 
       // Verify remaining events still work
-      expect(eventHandlerManager.getHandlersForEventType('EVENT_1')).toEqual(['handler1', 'handler2']);
-      expect(eventHandlerManager.getHandlersForEventType('EVENT_3')).toEqual(['handler4', 'handler5', 'handler6']);
+      expect(eventHandlerManager.getHandlersForEventType('EVENT_1')).toEqual([
+        'handler1',
+        'handler2',
+      ]);
+      expect(eventHandlerManager.getHandlersForEventType('EVENT_3')).toEqual([
+        'handler4',
+        'handler5',
+        'handler6',
+      ]);
     });
 
     it('should maintain separate handler maps for different instances', () => {
       // Reset instance to test singleton behavior
       (EventHandlerManager as any).instance = null;
-      
+
       const instance1 = EventHandlerManager.getInstance();
       const instance2 = EventHandlerManager.getInstance();
 
@@ -303,11 +303,11 @@ describe('EventHandlerManager', () => {
 
       for (const eventType of specialEventTypes) {
         const handlerNames = ['handler1'];
-        
+
         await eventHandlerManager.registerEventHandlers(eventType, handlerNames);
         expect(eventHandlerManager.hasHandlersForEventType(eventType)).toBe(true);
         expect(eventHandlerManager.getHandlersForEventType(eventType)).toEqual(handlerNames);
-        
+
         eventHandlerManager.unregisterEventHandlers(eventType);
         expect(eventHandlerManager.hasHandlersForEventType(eventType)).toBe(false);
       }

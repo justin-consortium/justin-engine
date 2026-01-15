@@ -31,7 +31,10 @@ const userManagerAddUsersToDatabaseStub = sinon.stub(UserManager, 'addUsers');
 const userManagerGetAllUsersStub = sinon.stub(UserManager, 'getAllUsers');
 const userManagerAddUserStub = sinon.stub(UserManager, 'addUser');
 const userManagerUpdateUserStub = sinon.stub(UserManager, 'updateUserByUniqueIdentifier');
-const userManagerGetUserByUniqueIdentifierStub = sinon.stub(UserManager, 'getUserByUniqueIdentifier');
+const userManagerGetUserByUniqueIdentifierStub = sinon.stub(
+  UserManager,
+  'getUserByUniqueIdentifier',
+);
 const userManagerDeleteUserStub = sinon.stub(UserManager, 'deleteUserByUniqueIdentifier');
 const userManagerStopUserManagerStub = sinon.stub(UserManager, 'shutdown');
 
@@ -57,14 +60,13 @@ const mockIntervalTimerEventGenerator = {
   stop: sinon.stub(),
 };
 
-// JustInWrapper 
+// JustInWrapper
 const justInWrapper: JustInWrapper = JustInWrapper.getInstance();
 
 // Stub the IntervalTimerEventGenerator constructor
 const intervalTimerEventGeneratorStub = sinon.stub().returns(mockIntervalTimerEventGenerator);
 
 describe('JustInWrapper', () => {
-
   beforeEach(() => {
     justInWrapper.shutdown();
     dataManagerInitStub.reset();
@@ -131,7 +133,7 @@ describe('JustInWrapper', () => {
     it('should create new instance when none exists', () => {
       // Kill existing instance
       (JustInWrapper as any).killInstance();
-      
+
       const instance = JustInWrapper.getInstance();
       expect(instance).toBeInstanceOf(JustInWrapper);
     });
@@ -141,7 +143,7 @@ describe('JustInWrapper', () => {
     beforeEach(async () => {
       await justInWrapper.shutdown();
     });
-    
+
     it('should initialize database successfully', async () => {
       Log.dev('In init: should initialize database successfully');
       await justInWrapper.init();
@@ -163,7 +165,7 @@ describe('JustInWrapper', () => {
     it('should not reinitialize if already initialized', async () => {
       // First initialization
       await justInWrapper.init();
-      
+
       // Reset stub to check if called again
       dataManagerInitStub.reset();
       userManagerInitStub.reset();
@@ -185,7 +187,10 @@ describe('JustInWrapper', () => {
 
   describe('addUsers', () => {
     it('should add users to database successfully', async () => {
-      const users = [{ uniqueIdentifier: 'user1', initialAttributes: { name: 'User 1' } }, { uniqueIdentifier: 'user2', initialAttributes: { name: 'User 2'} }];
+      const users = [
+        { uniqueIdentifier: 'user1', initialAttributes: { name: 'User 1' } },
+        { uniqueIdentifier: 'user2', initialAttributes: { name: 'User 2' } },
+      ];
 
       await justInWrapper.addUsers(users);
 
@@ -202,7 +207,6 @@ describe('JustInWrapper', () => {
   });
 
   describe('getAllUsers', () => {
-
     it('should retrieve all users', async () => {
       await justInWrapper.getAllUsers();
       expect(userManagerGetAllUsersStub.calledOnce).toBe(true);
@@ -237,7 +241,7 @@ describe('JustInWrapper', () => {
   describe('getUser', () => {
     it('should retrieve user information by uniqueIdentifier', async () => {
       const user = { uniqueIdentifier: 'user1', initialAttributes: { name: 'User 1' } };
-      await justInWrapper.getUser(user.uniqueIdentifier) as JUser;
+      (await justInWrapper.getUser(user.uniqueIdentifier)) as JUser;
       expect(userManagerGetUserByUniqueIdentifierStub.calledOnce).toBe(true);
       expect(userManagerGetUserByUniqueIdentifierStub.calledWith(user.uniqueIdentifier)).toBe(true);
     });
@@ -252,9 +256,12 @@ describe('JustInWrapper', () => {
   describe('updateUser', () => {
     it('should update user information by uniqueIdentifier', async () => {
       const user = { uniqueIdentifier: 'user1', initialAttributes: { name: 'User 1' } };
-      await justInWrapper.updateUser(user.uniqueIdentifier, {name: "New Name"}) as JUser;``
+      (await justInWrapper.updateUser(user.uniqueIdentifier, { name: 'New Name' })) as JUser;
+      ``;
       expect(userManagerUpdateUserStub.calledOnce).toBe(true);
-      expect(userManagerUpdateUserStub.calledWith(user.uniqueIdentifier, {name: "New Name"})).toBe(true);
+      expect(
+        userManagerUpdateUserStub.calledWith(user.uniqueIdentifier, { name: 'New Name' }),
+      ).toBe(true);
     });
 
     it('should handle user with null uniqueIdentifier and attributes to update', async () => {
@@ -318,7 +325,7 @@ describe('JustInWrapper', () => {
       justInWrapper.createIntervalTimerEventGenerator(eventTypeName, intervalInMs, options);
 
       const intervalTimerEventGenerators = justInWrapper.getIntervalTimerEventGenerators();
-      expect(intervalTimerEventGenerators.size).toBe(1);    
+      expect(intervalTimerEventGenerators.size).toBe(1);
       expect(intervalTimerEventGenerators.get(eventTypeName)).toBeDefined();
     });
   });
@@ -360,7 +367,7 @@ describe('JustInWrapper', () => {
       const mockGenerators = new Map();
       mockGenerators.set('EVENT1', mockIntervalTimerEventGenerator);
       mockGenerators.set('EVENT2', mockIntervalTimerEventGenerator);
-      
+
       (justInWrapper as any).intervalTimerEventGenerators = mockGenerators;
 
       await justInWrapper.startEngine();
@@ -459,7 +466,6 @@ describe('JustInWrapper', () => {
 
   describe('shutdown', () => {
     it('should shutdown engine successfully', async () => {
-
       await justInWrapper.init();
 
       justInWrapper.createIntervalTimerEventGenerator('EVENT1', 1000);
@@ -512,7 +518,6 @@ describe('JustInWrapper', () => {
   });
 
   describe('integration scenarios', () => {
-
     it('should handle complete lifecycle: initialize, start, shutdown', async () => {
       // Initialize
       await justInWrapper.init();
@@ -543,27 +548,27 @@ describe('JustInWrapper', () => {
     });
 
     it('should handle multiple task and decision rule registrations', () => {
-      const task1: TaskRegistration = { 
-        name: 'task1', 
-        beforeExecution: () => {}, 
+      const task1: TaskRegistration = {
+        name: 'task1',
+        beforeExecution: () => {},
         shouldActivate: () => ({ status: 'success' }),
         doAction: () => ({ status: 'success' }),
-        afterExecution: () => {} 
+        afterExecution: () => {},
       };
-      const task2: TaskRegistration = { 
-        name: 'task2', 
-        beforeExecution: () => {}, 
+      const task2: TaskRegistration = {
+        name: 'task2',
+        beforeExecution: () => {},
         shouldActivate: () => ({ status: 'success' }),
         doAction: () => ({ status: 'success' }),
-        afterExecution: () => {} 
+        afterExecution: () => {},
       };
-      const rule1: DecisionRuleRegistration = { 
-        name: 'rule1', 
-        beforeExecution: () => {}, 
+      const rule1: DecisionRuleRegistration = {
+        name: 'rule1',
+        beforeExecution: () => {},
         shouldActivate: () => ({ status: 'success' }),
         doAction: () => ({ status: 'success' }),
         selectAction: () => ({ status: 'success' }),
-        afterExecution: () => {} 
+        afterExecution: () => {},
       };
 
       justInWrapper.registerTask(task1);
@@ -574,4 +579,4 @@ describe('JustInWrapper', () => {
       expect(registerDecisionRuleStub.calledOnce).toBe(true);
     });
   });
-}); 
+});

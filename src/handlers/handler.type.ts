@@ -31,7 +31,11 @@ export type BaseHandler = {
   type: HandlerType;
   beforeExecution?: (event: JEvent) => Promise<void> | void;
   shouldActivate: (user: JUser, event: JEvent) => Promise<StepReturnResult> | StepReturnResult;
-  doAction: (user: JUser, event: JEvent, previousResult: StepReturnResult) => Promise<StepReturnResult> | StepReturnResult;
+  doAction: (
+    user: JUser,
+    event: JEvent,
+    previousResult: StepReturnResult,
+  ) => Promise<StepReturnResult> | StepReturnResult;
   afterExecution?: (event: JEvent) => Promise<void> | void;
 };
 
@@ -39,7 +43,7 @@ export type DecisionRule = BaseHandler & {
   selectAction: (
     user: JUser,
     event: JEvent,
-    previousResult: StepReturnResult
+    previousResult: StepReturnResult,
   ) => Promise<StepReturnResult> | StepReturnResult;
 };
 
@@ -55,10 +59,10 @@ export type ExecuteStepReturn<T = any> = {
 };
 
 export type RecordResult = {
-  event: JEvent
-  name: string,
-  steps: ExecuteStepReturn[],
-  user: JUser,
-}
+  event: JEvent;
+  name: string;
+  steps: ExecuteStepReturn[];
+  user: JUser;
+};
 
 export type RecordResultFunction = (record: RecordResult) => Promise<void> | void;

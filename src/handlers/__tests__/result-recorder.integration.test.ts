@@ -10,10 +10,7 @@ import {
   setResultRecorderPersistenceEnabled,
 } from '../result-recorder';
 import { RecordResult } from '../handler.type';
-import {
-  DECISION_RULE_RESULTS,
-  TASK_RESULTS,
-} from '../../data-manager/data-manager.constants';
+import { DECISION_RULE_RESULTS, TASK_RESULTS } from '../../data-manager/data-manager.constants';
 import { Log } from '../../logger/logger-manager';
 
 describe('Result Recorder Integration', () => {
@@ -146,10 +143,7 @@ describe('Result Recorder Integration', () => {
 
     const client = new MongoClient(process.env.MONGO_URI!);
     await client.connect();
-    const count = await client
-      .db(process.env.DB_NAME)
-      .collection(TASK_RESULTS)
-      .countDocuments();
+    const count = await client.db(process.env.DB_NAME).collection(TASK_RESULTS).countDocuments();
     // no task collection insert
     expect(count).toBe(0);
     await client.close();
@@ -284,7 +278,6 @@ describe('Result Recorder Integration', () => {
     expect(devStub.firstCall.args[0]).toBe(TAG_DECISION);
     expect(devStub.firstCall.args[1]).toEqual(record);
   });
-
 
   it('Lite mode (persistence disabled): logs to console and never touches DB', async () => {
     if (typeof setResultRecorderPersistenceEnabled === 'function') {

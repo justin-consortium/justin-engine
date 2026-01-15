@@ -19,7 +19,7 @@ const Log = createLogger({
  * Enable/disable persistence attempts inside the result recorder.
  * When disabled, the recorder will NEVER call DataManager and will log instead.
  */
-export function setResultRecorderPersistenceEnabled(enabled: boolean): void {
+function setResultRecorderPersistenceEnabled(enabled: boolean): void {
   _persistenceEnabled = enabled;
   _dm = null;
 }
@@ -39,14 +39,14 @@ function getDataManagerSafe() {
 /**
  * Registers the function to handle results from decision rules.
  */
-export function setDecisionRuleResultRecorder(fn: RecordResultFunction): void {
+function setDecisionRuleResultRecorder(fn: RecordResultFunction): void {
   recordDecisionRuleResultFn = fn;
 }
 
 /**
  * Registers the function to handle results from tasks.
  */
-export function setTaskResultRecorder(fn: RecordResultFunction): void {
+function setTaskResultRecorder(fn: RecordResultFunction): void {
   recordTaskResultFn = fn;
 }
 
@@ -83,7 +83,7 @@ async function persistOrLog(
 /**
  * Handles a decision rule result (or default fallback).
  */
-export async function handleDecisionRuleResult(record: RecordResult): Promise<void> {
+async function handleDecisionRuleResult(record: RecordResult): Promise<void> {
   if (!hasResultRecord(record)) return;
 
   if (recordDecisionRuleResultFn) {
@@ -104,7 +104,7 @@ export async function handleDecisionRuleResult(record: RecordResult): Promise<vo
 /**
  * Handles a task result (delegates to decision rule writer if set), else default.
  */
-export async function handleTaskResult(record: RecordResult): Promise<void> {
+async function handleTaskResult(record: RecordResult): Promise<void> {
   if (!hasResultRecord(record)) return;
 
   if (recordTaskResultFn) {
@@ -133,13 +133,23 @@ export async function handleTaskResult(record: RecordResult): Promise<void> {
 }
 
 /** True if there are any steps in the result object. */
-export function hasResultRecord(record: RecordResult): boolean {
+function hasResultRecord(record: RecordResult): boolean {
   return record.steps.length > 0;
 }
 
-export function __resetResultRecorderForTests(): void {
+function __resetResultRecorderForTests(): void {
   recordDecisionRuleResultFn = null;
   recordTaskResultFn = null;
   _dm = null;
   _persistenceEnabled = true;
 }
+
+export {
+  setResultRecorderPersistenceEnabled,
+  __resetResultRecorderForTests,
+  hasResultRecord,
+  handleTaskResult,
+  handleDecisionRuleResult,
+  setTaskResultRecorder,
+  setDecisionRuleResultRecorder,
+};

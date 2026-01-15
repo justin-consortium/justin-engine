@@ -14,7 +14,7 @@ const Log = createLogger({
  * @param fn - The function to execute for the step.
  * @returns {Promise<ExecuteStepReturn>} The result of the step execution.
  */
-export async function executeStep<T>(
+async function executeStep<T>(
   step: string,
   fn: () => Promise<StepReturnResult<T>>,
 ): Promise<ExecuteStepReturn<T>> {
@@ -36,3 +36,5 @@ export async function executeStep<T>(
     return { step, result: { status: 'error', error }, timestamp };
   }
 }
+
+export { executeStep };

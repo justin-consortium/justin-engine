@@ -29,7 +29,7 @@ const decisionRules: Map<string, DecisionRule> = new Map();
  * registerDecisionRule({ name: "checkWeather", shouldDecide: ..., decide: ..., doAction: ... });
  * // Logs: "Decision rule 'checkWeather' registered successfully."
  */
-export const registerDecisionRule = (rule: DecisionRuleRegistration): void => {
+const registerDecisionRule = (rule: DecisionRuleRegistration): void => {
   decisionRules.set(rule.name, { ...rule, type: HandlerType.DECISION_RULE });
   Log.info('Decision rule registered successfully.', { ruleName: rule.name });
 };
@@ -40,7 +40,7 @@ export const registerDecisionRule = (rule: DecisionRuleRegistration): void => {
  * @param {string} name - The name of the DecisionRule to retrieve.
  * @returns {DecisionRule | undefined} - The DecisionRule object if found, otherwise `undefined`.
  */
-export const getDecisionRuleByName = (name: string): DecisionRule | undefined => {
+const getDecisionRuleByName = (name: string): DecisionRule | undefined => {
   return decisionRules.get(name);
 };
 
@@ -57,11 +57,7 @@ export const getDecisionRuleByName = (name: string): DecisionRule | undefined =>
  * const rule = getDecisionRuleByName("checkWeather");
  * if (rule) await executeDecisionRule(rule, event, user);
  */
-export async function executeDecisionRule(
-  rule: DecisionRule,
-  event: JEvent,
-  user: JUser,
-): Promise<void> {
+async function executeDecisionRule(rule: DecisionRule, event: JEvent, user: JUser): Promise<void> {
   const results: ExecuteStepReturn[] = [];
   let decisionRuleExecutionStatus: 'not activated' | 'activated' | 'error' | 'finished' =
     'not activated';
@@ -73,29 +69,22 @@ export async function executeDecisionRule(
       event,
     });
 
-    const shouldActivateResult = await executeStep(
-      DecisionRuleStep.SHOULD_ACTIVATE,
-      async () => Promise.resolve(rule.shouldActivate(user, event)),
+    const shouldActivateResult = await executeStep(DecisionRuleStep.SHOULD_ACTIVATE, async () =>
+      Promise.resolve(rule.shouldActivate(user, event)),
     );
 
     if (shouldActivateResult.result.status === 'success') {
       decisionRuleExecutionStatus = 'activated';
       results.push(shouldActivateResult);
 
-      const selectionActionResult = await executeStep(
-        DecisionRuleStep.SELECT_ACTION,
-        async () =>
-          Promise.resolve(rule.selectAction(user, event, shouldActivateResult.result)),
+      const selectionActionResult = await executeStep(DecisionRuleStep.SELECT_ACTION, async () =>
+        Promise.resolve(rule.selectAction(user, event, shouldActivateResult.result)),
       );
       results.push(selectionActionResult);
 
       if (selectionActionResult.result.status === 'success') {
-        const actionResult = await executeStep(
-          DecisionRuleStep.DO_ACTION,
-          async () =>
-            Promise.resolve(
-              rule.doAction(user, event, selectionActionResult.result),
-            ),
+        const actionResult = await executeStep(DecisionRuleStep.DO_ACTION, async () =>
+          Promise.resolve(rule.doAction(user, event, selectionActionResult.result)),
         );
         results.push(actionResult);
       }
@@ -137,3 +126,5 @@ export async function executeDecisionRule(
     });
   }
 }
+
+export { registerDecisionRule, executeDecisionRule, getDecisionRuleByName, executeStep };

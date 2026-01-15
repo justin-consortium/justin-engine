@@ -85,7 +85,7 @@ describe('Result Recorder Module', () => {
       sinon.assert.calledOnceWithExactly(
         dmInstance.addItemToCollection,
         DECISION_RULE_RESULTS,
-        nonEmptyRecord
+        nonEmptyRecord,
       );
       sinon.assert.notCalled(devStub);
     });
@@ -114,7 +114,7 @@ describe('Result Recorder Module', () => {
       sinon.assert.calledOnceWithExactly(
         dmInstance.addItemToCollection,
         DECISION_RULE_RESULTS,
-        nonEmptyRecord
+        nonEmptyRecord,
       );
       sinon.assert.notCalled(devStub);
     });
@@ -169,7 +169,7 @@ describe('Result Recorder Module', () => {
       sinon.assert.calledOnceWithExactly(
         dmInstance.addItemToCollection,
         TASK_RESULTS,
-        nonEmptyRecord
+        nonEmptyRecord,
       );
       sinon.assert.notCalled(devStub);
     });
@@ -185,7 +185,7 @@ describe('Result Recorder Module', () => {
       sinon.assert.calledOnceWithExactly(
         dmInstance.addItemToCollection,
         TASK_RESULTS,
-        nonEmptyRecord
+        nonEmptyRecord,
       );
       sinon.assert.notCalled(devStub);
     });
@@ -201,7 +201,7 @@ describe('Result Recorder Module', () => {
       sinon.assert.calledOnceWithExactly(
         dmInstance.addItemToCollection,
         TASK_RESULTS,
-        nonEmptyRecord
+        nonEmptyRecord,
       );
       sinon.assert.notCalled(devStub);
     });

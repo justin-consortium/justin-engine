@@ -13,4 +13,3 @@ export type IntervalTimerEventGeneratorOptions = {
   simulatedTickDurationInMs?: number;
   simulatedTickCountMax?: number;
 };
-

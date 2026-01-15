@@ -1,12 +1,5 @@
-import { createLogger } from '@just-in/core';
-import type { JUser } from '@just-in/core';
-import {
-  ExecuteStepReturn,
-  HandlerType,
-  Task,
-  TaskRegistration,
-  TaskStep,
-} from './handler.type';
+import { createLogger, JUser } from '@just-in/core';
+import { ExecuteStepReturn, HandlerType, Task, TaskRegistration, TaskStep } from './handler.type';
 import { executeStep } from './steps.helpers';
 import { JEvent } from '../event/event.type';
 import { handleTaskResult } from './result-recorder';
@@ -23,7 +16,7 @@ const tasks: Map<string, Task> = new Map();
  * Registers a Task by its name, setting its type to `TASK` in the process.
  * @param {TaskRegistration} task - The task to register, with the `type` set to `TASK`.
  */
-export const registerTask = (task: TaskRegistration): void => {
+const registerTask = (task: TaskRegistration): void => {
   tasks.set(task.name, { ...task, type: HandlerType.TASK });
   Log.info('Task registered successfully.', { taskName: task.name });
 };
@@ -33,7 +26,7 @@ export const registerTask = (task: TaskRegistration): void => {
  * @param {string} name - The name of the Task to retrieve.
  * @returns {Task | undefined} - The Task if found, or undefined otherwise.
  */
-export const getTaskByName = (name: string): Task | undefined => {
+const getTaskByName = (name: string): Task | undefined => {
   return tasks.get(name);
 };
 
@@ -44,11 +37,7 @@ export const getTaskByName = (name: string): Task | undefined => {
  * @param event - The triggering event.
  * @param user - The user for whom the Task is being executed.
  */
-export async function executeTask(
-  task: Task,
-  event: JEvent,
-  user: JUser,
-): Promise<void> {
+async function executeTask(task: Task, event: JEvent, user: JUser): Promise<void> {
   const results: ExecuteStepReturn<any>[] = [];
 
   try {
@@ -58,18 +47,15 @@ export async function executeTask(
       event,
     });
 
-    const shouldActivateResult = await executeStep(
-      TaskStep.SHOULD_ACTIVATE,
-      async () => Promise.resolve(task.shouldActivate(user, event)),
+    const shouldActivateResult = await executeStep(TaskStep.SHOULD_ACTIVATE, async () =>
+      Promise.resolve(task.shouldActivate(user, event)),
     );
 
     if (shouldActivateResult.result.status === 'success') {
       results.push(shouldActivateResult);
 
       const actionResult = await executeStep(TaskStep.DO_ACTION, async () =>
-        Promise.resolve(
-          task.doAction(user, event, shouldActivateResult.result),
-        ),
+        Promise.resolve(task.doAction(user, event, shouldActivateResult.result)),
       );
       results.push(actionResult);
     } else {
@@ -110,3 +96,5 @@ export async function executeTask(
     });
   }
 }
+
+export { registerTask, getTaskByName, executeTask };

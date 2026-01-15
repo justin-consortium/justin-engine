@@ -1,8 +1,7 @@
-import { IntervalTimerEventGeneratorOptions } from "./event.type";
-import { publishEvent } from "./event-queue";
+import { IntervalTimerEventGeneratorOptions } from './event.type';
+import { publishEvent } from './event-queue';
 
-export class IntervalTimerEventGenerator {
-
+class IntervalTimerEventGenerator {
   private intervalId: NodeJS.Timeout | null = null;
   private simulatedStartDate: Date | null = null;
   private useSimulatedStartDate: boolean = false;
@@ -13,7 +12,7 @@ export class IntervalTimerEventGenerator {
   constructor(
     private readonly intervalInMs: number,
     private readonly eventTypeName: string,
-    private readonly options: IntervalTimerEventGeneratorOptions = {}
+    private readonly options: IntervalTimerEventGeneratorOptions = {},
   ) {
     if (intervalInMs <= 0) {
       throw new Error('Interval must be greater than 0');
@@ -33,15 +32,15 @@ export class IntervalTimerEventGenerator {
 
   public start(): void {
     const startDate = new Date();
-    const timerInterval =
-      this.useSimulatedStartDate ? this.simulatedTickDurationInMs : this.intervalInMs;
+    const timerInterval = this.useSimulatedStartDate
+      ? this.simulatedTickDurationInMs
+      : this.intervalInMs;
     this.intervalId = setInterval(() => {
       let eventTimestamp: Date;
       if (this.useSimulatedStartDate) {
         eventTimestamp = new Date(
-          this.simulatedStartDate!.getTime()
-          + this.simulatedTickCount
-          * this.intervalInMs);
+          this.simulatedStartDate!.getTime() + this.simulatedTickCount * this.intervalInMs,
+        );
         this.simulatedTickCount++;
         if (this.simulatedTickCountMax && this.simulatedTickCount >= this.simulatedTickCountMax) {
           this.stop();
@@ -61,3 +60,4 @@ export class IntervalTimerEventGenerator {
   }
 }
 
+export { IntervalTimerEventGenerator };

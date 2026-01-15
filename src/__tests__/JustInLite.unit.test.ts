@@ -51,12 +51,8 @@ describe('JustInLite (Sinon)', () => {
     });
 
     it('accepts JUser[] and replaces in-memory set atomically', async () => {
-      const first: JUser[] = [
-        { id: 'a', uniqueIdentifier: 'a', attributes: { foo: 1 } },
-      ];
-      const second: JUser[] = [
-        { id: 'b', uniqueIdentifier: 'b', attributes: { bar: 2 } },
-      ];
+      const first: JUser[] = [{ id: 'a', uniqueIdentifier: 'a', attributes: { foo: 1 } }];
+      const second: JUser[] = [{ id: 'b', uniqueIdentifier: 'b', attributes: { bar: 2 } }];
 
       await justin.loadUsers(first);
       await justin.loadUsers(second);
@@ -97,7 +93,9 @@ describe('JustInLite (Sinon)', () => {
 
     it('throws if event type not registered', async () => {
       await justin.loadUsers([{ id: 'u', uniqueIdentifier: 'u', attributes: {} }]);
-      await expect(justin.publishEvent('MISSING', new Date())).rejects.toThrow(/No handlers registered/i);
+      await expect(justin.publishEvent('MISSING', new Date())).rejects.toThrow(
+        /No handlers registered/i,
+      );
     });
 
     it('builds event and calls shared executor once', async () => {

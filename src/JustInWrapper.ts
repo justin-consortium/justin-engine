@@ -3,8 +3,10 @@ import DataManager, {
   UserManager,
   createLogger,
   configureLogger as configureCoreLogger,
+  NewUserRecord,
+  JUser,
+  LoggerConfig,
 } from '@just-in/core';
-import type { NewUserRecord, JUser, LoggerConfig } from '@just-in/core';
 import { EventHandlerManager } from './event/event-handler-manager';
 import {
   publishEvent,
@@ -22,10 +24,7 @@ import {
 } from './handlers/handler.type';
 import { IntervalTimerEventGenerator } from './event/interval-timer-event-generator';
 import { IntervalTimerEventGeneratorOptions } from './event/event.type';
-import {
-  setDecisionRuleResultRecorder,
-  setTaskResultRecorder,
-} from './handlers/result-recorder';
+import { setDecisionRuleResultRecorder, setTaskResultRecorder } from './handlers/result-recorder';
 
 const Log = createLogger({
   context: {
@@ -47,12 +46,10 @@ const baseLoggingContext: Pick<LoggerConfig, 'context'> = {
 export class JustInWrapper {
   protected static instance: JustInWrapper | null = null;
   private dataManager: DataManager = DataManager.getInstance();
-  private eventHandlerManager: EventHandlerManager =
-    EventHandlerManager.getInstance();
+  private eventHandlerManager: EventHandlerManager = EventHandlerManager.getInstance();
   private isInitialized = false;
   private initializedAt: Date | null = null;
-  private intervalTimerEventGenerators: Map<string, IntervalTimerEventGenerator> =
-    new Map();
+  private intervalTimerEventGenerators: Map<string, IntervalTimerEventGenerator> = new Map();
 
   protected constructor() {
     this.isInitialized = false;
@@ -138,14 +135,12 @@ export class JustInWrapper {
 
     await startEventQueueProcessing();
 
-    this.intervalTimerEventGenerators.forEach(
-      (eventGenerator, eventTypeName) => {
-        Log.info('Starting interval timer event generator.', {
-          eventTypeName,
-        });
-        eventGenerator.start();
-      },
-    );
+    this.intervalTimerEventGenerators.forEach((eventGenerator, eventTypeName) => {
+      Log.info('Starting interval timer event generator.', {
+        eventTypeName,
+      });
+      eventGenerator.start();
+    });
 
     await processEventQueue();
     Log.info('Engine started and processing events.', {
@@ -158,14 +153,12 @@ export class JustInWrapper {
    * This can be called to stop the engine without shutting down the application.
    */
   public async stopEngine(): Promise<void> {
-    this.intervalTimerEventGenerators.forEach(
-      (eventGenerator, eventTypeName) => {
-        Log.info('Stopping interval timer event generator.', {
-          eventTypeName,
-        });
-        eventGenerator.stop();
-      },
-    );
+    this.intervalTimerEventGenerators.forEach((eventGenerator, eventTypeName) => {
+      Log.info('Stopping interval timer event generator.', {
+        eventTypeName,
+      });
+      eventGenerator.stop();
+    });
     stopEventQueueProcessing();
     Log.info('Engine stopped and cleared of all events.');
   }
@@ -215,10 +208,7 @@ export class JustInWrapper {
     uniqueIdentifier: string,
     attributesToUpdate: Record<string, any>,
   ): Promise<JUser | null> {
-    return UserManager.updateUserByUniqueIdentifier(
-      uniqueIdentifier,
-      attributesToUpdate,
-    );
+    return UserManager.updateUserByUniqueIdentifier(uniqueIdentifier, attributesToUpdate);
   }
 
   /**
@@ -235,10 +225,7 @@ export class JustInWrapper {
    * @param {string} eventType - The type of the event.
    * @param {string[]} handlers - The ordered task or decision rule names for the event.
    */
-  public async registerEventHandlers(
-    eventType: string,
-    handlers: string[],
-  ): Promise<void> {
+  public async registerEventHandlers(eventType: string, handlers: string[]): Promise<void> {
     await this.eventHandlerManager.registerEventHandlers(eventType, handlers);
   }
 
@@ -261,11 +248,7 @@ export class JustInWrapper {
     intervalInMs: number,
     options: IntervalTimerEventGeneratorOptions = {},
   ): void {
-    const eventGenerator = new IntervalTimerEventGenerator(
-      intervalInMs,
-      eventTypeName,
-      options,
-    );
+    const eventGenerator = new IntervalTimerEventGenerator(intervalInMs, eventTypeName, options);
     this.intervalTimerEventGenerators.set(eventTypeName, eventGenerator);
   }
 
@@ -273,10 +256,7 @@ export class JustInWrapper {
    * Returns the interval timer event generators.
    * @returns {Map<string, IntervalTimerEventGenerator>} The interval timer event generators.
    */
-  public getIntervalTimerEventGenerators(): Map<
-    string,
-    IntervalTimerEventGenerator
-  > {
+  public getIntervalTimerEventGenerators(): Map<string, IntervalTimerEventGenerator> {
     return this.intervalTimerEventGenerators;
   }
 
@@ -348,9 +328,7 @@ export class JustInWrapper {
    * Will default to writing to the DB if not set.
    * @param {RecordResultFunction} decisionRuleWriter - The function to take in the results of a decision rule.
    */
-  public configureDecisionRuleResultWriter(
-    decisionRuleWriter: RecordResultFunction,
-  ): void {
+  public configureDecisionRuleResultWriter(decisionRuleWriter: RecordResultFunction): void {
     setDecisionRuleResultRecorder(decisionRuleWriter);
   }
 

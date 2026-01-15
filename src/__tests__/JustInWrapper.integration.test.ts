@@ -1,14 +1,14 @@
-import { MongoMemoryReplSet } from "mongodb-memory-server";
-import { JustInWrapper } from "../JustInWrapper";
-import { Log } from "../logger/logger-manager";
-import { EventHandlerManager } from "../event/event-handler-manager";
-import { UserManager } from "../user-manager/user-manager";
-import DataManager from "../data-manager/data-manager";
+import { MongoMemoryReplSet } from 'mongodb-memory-server';
+import { JustInWrapper } from '../JustInWrapper';
+import { Log } from '../logger/logger-manager';
+import { EventHandlerManager } from '../event/event-handler-manager';
+import { UserManager } from '../user-manager/user-manager';
+import DataManager from '../data-manager/data-manager';
 import sinon from 'sinon';
-import { DBType } from "../data-manager/data-manager.constants";
-import { MongoDBManager } from "../data-manager/mongo/mongo-data-manager";
-import { TaskRegistration, DecisionRuleRegistration } from "../handlers/handler.type";
-import { JUser } from "../user-manager/user.type";
+import { DBType } from '../data-manager/data-manager.constants';
+import { MongoDBManager } from '../data-manager/mongo/mongo-data-manager';
+import { TaskRegistration, DecisionRuleRegistration } from '../handlers/handler.type';
+import { JUser } from '../user-manager/user.type';
 
 function resetJustinWrapperSingleton(): void {
   const wrapperModule = require('../JustInWrapper');
@@ -79,19 +79,24 @@ describe('JustInWrapper Integration', () => {
 
   describe('User Management', () => {
     beforeEach(async () => {
-      const allUsers = await justIn.getAllUsers() as JUser[];
+      const allUsers = (await justIn.getAllUsers()) as JUser[];
       // Clean up existing users before each test
       if (allUsers.length > 0) {
-        await Promise.all(allUsers.map(user => justIn.deleteUser(user.uniqueIdentifier)));
+        await Promise.all(allUsers.map((user) => justIn.deleteUser(user.uniqueIdentifier)));
       }
     });
 
-    afterEach(async () => {
-    });
+    afterEach(async () => {});
     it('should add and retrieve users to/from database successfully', async () => {
       const users = [
-        { uniqueIdentifier: 'user1', initialAttributes: { name: 'User 1', email: 'user1@test.com' } },
-        { uniqueIdentifier: 'user2', initialAttributes: { name: 'User 2', email: 'user2@test.com' } }
+        {
+          uniqueIdentifier: 'user1',
+          initialAttributes: { name: 'User 1', email: 'user1@test.com' },
+        },
+        {
+          uniqueIdentifier: 'user2',
+          initialAttributes: { name: 'User 2', email: 'user2@test.com' },
+        },
       ];
       await justIn.addUsers(users);
       const allUsers = UserManager.getAllUsers();
@@ -105,7 +110,10 @@ describe('JustInWrapper Integration', () => {
     });
 
     it('should add and retrieve a user to database successfully', async () => {
-      const user = { uniqueIdentifier: 'user1', initialAttributes: { name: 'User 1', email: 'user1@test.com' } };
+      const user = {
+        uniqueIdentifier: 'user1',
+        initialAttributes: { name: 'User 1', email: 'user1@test.com' },
+      };
       await justIn.addUser(user);
       const theUser = UserManager.getUserByUniqueIdentifier(user.uniqueIdentifier);
       expect(theUser).toBeDefined();
@@ -114,39 +122,47 @@ describe('JustInWrapper Integration', () => {
     });
 
     it('should update a user in database successfully', async () => {
-      const user = { uniqueIdentifier: 'user1', initialAttributes: { name: 'User 1', email: 'user1@test.com' } };
-      
-      const addedUser:JUser = await justIn.addUser(user) as JUser;
+      const user = {
+        uniqueIdentifier: 'user1',
+        initialAttributes: { name: 'User 1', email: 'user1@test.com' },
+      };
+
+      const addedUser: JUser = (await justIn.addUser(user)) as JUser;
       expect(addedUser).toBeDefined();
       expect(addedUser.uniqueIdentifier).toBe(user.uniqueIdentifier);
       expect(addedUser.attributes).toEqual(user.initialAttributes);
 
       const attributesToUpdate = { name: 'Updated User 1', email: 'updated_user1@test.com' };
-      const updatedUser = await justIn.updateUser(user.uniqueIdentifier, attributesToUpdate) as JUser;
+      const updatedUser = (await justIn.updateUser(
+        user.uniqueIdentifier,
+        attributesToUpdate,
+      )) as JUser;
       expect(updatedUser).toBeDefined();
       expect(updatedUser.uniqueIdentifier).toBe(user.uniqueIdentifier);
       expect(updatedUser.attributes).toEqual(attributesToUpdate);
-    
-      const theUser: JUser = await justIn.getUser(user.uniqueIdentifier) as JUser;
+
+      const theUser: JUser = (await justIn.getUser(user.uniqueIdentifier)) as JUser;
       expect(theUser).toBeDefined();
       expect(theUser.uniqueIdentifier).toBe(user.uniqueIdentifier);
       expect(theUser.attributes).toEqual(attributesToUpdate);
     });
 
     it('should delete a user in database successfully', async () => {
-      const user = { uniqueIdentifier: 'user1', initialAttributes: { name: 'User 1', email: 'user1@test.com' } };
-      
-      const addedUser:JUser = await justIn.addUser(user) as JUser;
+      const user = {
+        uniqueIdentifier: 'user1',
+        initialAttributes: { name: 'User 1', email: 'user1@test.com' },
+      };
+
+      const addedUser: JUser = (await justIn.addUser(user)) as JUser;
       expect(addedUser).toBeDefined();
       expect(addedUser.uniqueIdentifier).toBe(user.uniqueIdentifier);
       expect(addedUser.attributes).toEqual(user.initialAttributes);
 
-      const deletedUser:void = await justIn.deleteUser(user.uniqueIdentifier);
+      const deletedUser: void = await justIn.deleteUser(user.uniqueIdentifier);
       expect(deletedUser).toBeUndefined();
 
       const theUser: JUser | null = await justIn.getUser(user.uniqueIdentifier);
       expect(theUser).toBeNull();
-
     });
   });
 
@@ -165,7 +181,7 @@ describe('JustInWrapper Integration', () => {
       justIn.createIntervalTimerEventGenerator('TIMER_EVENT', 1000, {
         simulatedStartDate: new Date(),
         simulatedTickDurationInMs: 1000,
-        simulatedTickCountMax: 5
+        simulatedTickCountMax: 5,
       });
       expect(justIn.getIntervalTimerEventGenerators().has('TIMER_EVENT')).toBe(true);
     });
@@ -180,7 +196,6 @@ describe('JustInWrapper Integration', () => {
   });
 
   describe('Logger Configuration', () => {
-
     const customLogger = {
       info: sinon.stub(),
       warn: sinon.stub(),
@@ -194,7 +209,6 @@ describe('JustInWrapper Integration', () => {
       customLogger.error.reset();
       customLogger.dev.reset();
       justIn.configureLogger(customLogger);
-
     });
 
     it('should configure custom logger', async () => {
@@ -214,7 +228,6 @@ describe('JustInWrapper Integration', () => {
     });
 
     it('should set logging levels', async () => {
-
       const levels = {
         info: true,
         warn: false,
@@ -235,7 +248,6 @@ describe('JustInWrapper Integration', () => {
 
       Log.dev('test message');
       expect(customLogger.dev.called).toBe(false);
-
     });
   });
 
@@ -253,22 +265,24 @@ describe('JustInWrapper Integration', () => {
         name: 'testDecisionRule',
         shouldActivate: sinon.stub().returns({ status: 'success', result: 'ok' }),
         selectAction: sinon.stub().returns({ status: 'success', result: 'ok' }),
-        doAction: sinon.stub().returns({ status: 'success', result: 'ok' })
+        doAction: sinon.stub().returns({ status: 'success', result: 'ok' }),
       };
 
       const aTask: TaskRegistration = {
         name: 'testTask',
         shouldActivate: sinon.stub().returns({ status: 'success', result: 'ok' }),
-        doAction: sinon.stub().returns({ status: 'success', result: 'ok' })
+        doAction: sinon.stub().returns({ status: 'success', result: 'ok' }),
       };
 
       justIn.registerDecisionRule(aDecisionRule);
       justIn.registerTask(aTask);
       justIn.registerEventHandlers('TEST_EVENT', ['testDecisionRule', 'testTask']);
-      await justIn.addUsers([{ uniqueIdentifier: 'user1', initialAttributes: { name: 'U1', email: 'u1@test.com' } }]);
+      await justIn.addUsers([
+        { uniqueIdentifier: 'user1', initialAttributes: { name: 'U1', email: 'u1@test.com' } },
+      ]);
       await justIn.startEngine();
       await justIn.publishEvent('TEST_EVENT', new Date(), {});
-      await new Promise(res => setTimeout(res, 1000));
+      await new Promise((res) => setTimeout(res, 1000));
 
       expect((aDecisionRule.shouldActivate as sinon.SinonStub).called).toBe(true);
       expect((aDecisionRule.selectAction as sinon.SinonStub).called).toBe(true);
@@ -284,15 +298,17 @@ describe('JustInWrapper Integration', () => {
         name: 'testDecisionRule',
         shouldActivate: sinon.stub().returns({ status: 'success', result: 'ok' }),
         selectAction: sinon.stub().returns({ status: 'success', result: 'ok' }),
-        doAction: sinon.stub().returns({ status: 'success', result: 'ok' })
+        doAction: sinon.stub().returns({ status: 'success', result: 'ok' }),
       };
 
       justIn.registerDecisionRule(aDecisionRule);
       justIn.registerEventHandlers('INTERVAL_EVENT', ['testDecisionRule']);
-      await justIn.addUsers([{ uniqueIdentifier: 'user2', initialAttributes: { name: 'U2', email: 'u2@test.com' } }]);
+      await justIn.addUsers([
+        { uniqueIdentifier: 'user2', initialAttributes: { name: 'U2', email: 'u2@test.com' } },
+      ]);
       justIn.createIntervalTimerEventGenerator('INTERVAL_EVENT', 1000);
       await justIn.startEngine();
-      await new Promise(res => setTimeout(res, 2500));
+      await new Promise((res) => setTimeout(res, 2500));
 
       expect((aDecisionRule.shouldActivate as sinon.SinonStub).callCount).toBeGreaterThanOrEqual(2);
     });

@@ -3,15 +3,12 @@ import DataManager, {
   UserManager,
   CollectionChangeType,
   createLogger,
+  JUser,
 } from '@just-in/core';
-import type { JUser } from '@just-in/core';
 import { JEvent } from './event.type';
 
 import { executeTask, getTaskByName } from '../handlers/task.manager';
-import {
-  executeDecisionRule,
-  getDecisionRuleByName,
-} from '../handlers/decision-rule.manager';
+import { executeDecisionRule, getDecisionRuleByName } from '../handlers/decision-rule.manager';
 import { EventHandlerManager } from './event-handler-manager';
 import { executeEventForUsers } from './event-executor';
 import { ARCHIVED_EVENTS, EVENT_QUEUE } from '../constants';
@@ -33,7 +30,7 @@ const Log = createLogger({
 /**
  * Triggers an event by creating an instance in the `EVENTS_QUEUE`.
  */
-export const publishEvent = async (
+const publishEvent = async (
   eventType: string,
   generatedTimestamp: Date,
   eventDetails?: Record<string, any>,
@@ -75,7 +72,7 @@ export const publishEvent = async (
 /**
  * Processes events in the `EVENTS_QUEUE`.
  */
-export const processEventQueue = async (): Promise<void> => {
+const processEventQueue = async (): Promise<void> => {
   if (isProcessingQueue) {
     Log.info('Event queue processing already in progress; skipping new run.');
     return;
@@ -88,9 +85,7 @@ export const processEventQueue = async (): Promise<void> => {
 
     while (shouldProcessQueue) {
       const users = UserManager.getAllUsers();
-      const events = (await dataManager.getAllInCollection(
-        EVENT_QUEUE,
-      )) as JEvent[];
+      const events = (await dataManager.getAllInCollection(EVENT_QUEUE)) as JEvent[];
 
       if (!events || events.length === 0) {
         Log.debug('No events left in the queue; pausing processing.');
@@ -127,7 +122,7 @@ export const processEventQueue = async (): Promise<void> => {
 /**
  * Sets up a listener for the `EVENTS_QUEUE` collection.
  */
-export const setupEventQueueListener = async (): Promise<void> => {
+const setupEventQueueListener = async (): Promise<void> => {
   try {
     Log.debug('Setting up event queue listener.');
 
@@ -136,18 +131,12 @@ export const setupEventQueueListener = async (): Promise<void> => {
       return;
     }
 
-    clm.addChangeListener(
-      EVENT_QUEUE,
-      CollectionChangeType.INSERT,
-      async () => {
-        if (shouldProcessQueue) {
-          Log.debug(
-            'New event detected in EVENTS_QUEUE; triggering processing.',
-          );
-          await processEventQueue();
-        }
-      },
-    );
+    clm.addChangeListener(EVENT_QUEUE, CollectionChangeType.INSERT, async () => {
+      if (shouldProcessQueue) {
+        Log.debug('New event detected in EVENTS_QUEUE; triggering processing.');
+        await processEventQueue();
+      }
+    });
 
     // Kick off processing once on startup as well.
     await processEventQueue();
@@ -165,9 +154,7 @@ export const setupEventQueueListener = async (): Promise<void> => {
  * potential future refactors.
  */
 const processHandlers = async (event: JEvent, user: JUser): Promise<void> => {
-  for (const handlerName of eventHandlerManager.getHandlersForEventType(
-    event.eventType,
-  )) {
+  for (const handlerName of eventHandlerManager.getHandlersForEventType(event.eventType)) {
     try {
       const task = getTaskByName(handlerName);
       if (task) {
@@ -256,7 +243,7 @@ const archiveEvent = async (event: JEvent): Promise<void> => {
 /**
  * Stops the event queue processing.
  */
-export const stopEventQueueProcessing = (): void => {
+const stopEventQueueProcessing = (): void => {
   shouldProcessQueue = false;
   clm.removeChangeListener(EVENT_QUEUE, CollectionChangeType.INSERT);
   Log.info('Event queue processing stopped.');
@@ -265,7 +252,7 @@ export const stopEventQueueProcessing = (): void => {
 /**
  * Starts the event queue processing.
  */
-export const startEventQueueProcessing = async (): Promise<void> => {
+const startEventQueueProcessing = async (): Promise<void> => {
   await setupEventQueueListener();
   shouldProcessQueue = true;
   Log.debug('Event queue processing started.');
@@ -274,14 +261,14 @@ export const startEventQueueProcessing = async (): Promise<void> => {
 /**
  * Returns true if the event queue is running.
  */
-export function isRunning(): boolean {
+function isRunning(): boolean {
   return shouldProcessQueue;
 }
 
 /**
  * Returns true if the event queue is empty.
  */
-export async function queueIsEmpty(): Promise<boolean> {
+async function queueIsEmpty(): Promise<boolean> {
   const events = await dataManager.getAllInCollection(EVENT_QUEUE);
   return !events || events.length === 0;
 }
@@ -289,6 +276,17 @@ export async function queueIsEmpty(): Promise<boolean> {
 /**
  * Sets the shouldProcessQueue flag.
  */
-export const setShouldProcessQueue = (shouldProcess: boolean): void => {
+const setShouldProcessQueue = (shouldProcess: boolean): void => {
   shouldProcessQueue = shouldProcess;
+};
+
+export {
+  setShouldProcessQueue,
+  queueIsEmpty,
+  isRunning,
+  startEventQueueProcessing,
+  stopEventQueueProcessing,
+  setupEventQueueListener,
+  processEventQueue,
+  publishEvent,
 };

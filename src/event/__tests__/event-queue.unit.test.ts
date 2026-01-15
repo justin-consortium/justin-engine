@@ -10,7 +10,6 @@ import * as DecisionRuleManager from '../../handlers/decision-rule.manager';
 import { JEvent } from '../event.type';
 import { JUser } from '../../user-manager/user.type';
 import { CollectionChangeType } from '../../data-manager/data-manager.type';
-import { BaseHandler, DecisionRule, Task } from '../../handlers/handler.type';
 import * as EventExecutor from '../event-executor';
 
 // Create stubs for all dependencies
@@ -96,7 +95,7 @@ describe('Event Queue', () => {
       const eventDetails = { test: 'data' };
 
       hasHandlersForEventTypeStub.returns(true);
-      addItemToCollectionStub.resolves({id: 'event1'} as JEvent);
+      addItemToCollectionStub.resolves({ id: 'event1' } as JEvent);
 
       await EventQueue.publishEvent(eventType, timestamp, eventDetails);
 
@@ -121,9 +120,11 @@ describe('Event Queue', () => {
       expect(hasHandlersForEventTypeStub.calledWith(eventType)).toBe(true);
       expect(addItemToCollectionStub.called).toBe(false);
 
-      expect(logWarnStub.calledWith(
-        `No handlers found for event type "${eventType}". Skipping event publication.`
-      )).toBe(true);
+      expect(
+        logWarnStub.calledWith(
+          `No handlers found for event type "${eventType}". Skipping event publication.`,
+        ),
+      ).toBe(true);
     });
 
     it('should handle errors during publication', async () => {
@@ -136,17 +137,17 @@ describe('Event Queue', () => {
 
       await expect(EventQueue.publishEvent(eventType, timestamp)).rejects.toThrow('Database error');
 
-      expect(logErrorStub.calledWith(
-        `Failed to publish event "${eventType}": ${error}`
-      )).toBe(true);
+      expect(logErrorStub.calledWith(`Failed to publish event "${eventType}": ${error}`)).toBe(
+        true,
+      );
     });
   });
 
   describe('processEventQueue', () => {
     it('should process events successfully', async () => {
       const mockUsers: JUser[] = [
-        { id: 'user1', uniqueIdentifier: 'user1-unique', attributes:{name: 'User 1'} } as JUser,
-        { id: 'user2', uniqueIdentifier: 'user2-unique', attributes:{name: 'User 2'} } as JUser,
+        { id: 'user1', uniqueIdentifier: 'user1-unique', attributes: { name: 'User 1' } } as JUser,
+        { id: 'user2', uniqueIdentifier: 'user2-unique', attributes: { name: 'User 2' } } as JUser,
       ];
 
       const mockEvents: JEvent[] = [
@@ -197,11 +198,15 @@ describe('Event Queue', () => {
 
       await Promise.all([firstPromise, secondPromise]);
 
-      expect(logInfoStub.calledWith('Event queue processing already in progress. Skipping processing.')).toBe(true);
+      expect(
+        logInfoStub.calledWith('Event queue processing already in progress. Skipping processing.'),
+      ).toBe(true);
     });
 
     it('should handle processing errors gracefully', async () => {
-      const mockUsers: JUser[] = [{ id: 'user1', uniqueIdentifier: 'user1-unique', attributes:{name: 'User 1'} } as JUser];
+      const mockUsers: JUser[] = [
+        { id: 'user1', uniqueIdentifier: 'user1-unique', attributes: { name: 'User 1' } } as JUser,
+      ];
       const mockEvents: JEvent[] = [
         {
           id: 'event1',
@@ -219,9 +224,11 @@ describe('Event Queue', () => {
 
       await EventQueue.processEventQueue();
 
-      expect(logErrorStub.calledWith(
-        'Failed to archive event "TEST_EVENT" with ID: event1: Error: Archive error'
-      )).toBe(true);
+      expect(
+        logErrorStub.calledWith(
+          'Failed to archive event "TEST_EVENT" with ID: event1: Error: Archive error',
+        ),
+      ).toBe(true);
     });
   });
 
@@ -245,11 +252,11 @@ describe('Event Queue', () => {
 
       EventQueue.setupEventQueueListener();
 
-      await new Promise(resolve => setTimeout(resolve, 0));
+      await new Promise((resolve) => setTimeout(resolve, 0));
 
-      expect(logErrorStub.calledWith(
-        `Error during event queue processing: Error: Processing error`
-      )).toBe(true);
+      expect(
+        logErrorStub.calledWith(`Error during event queue processing: Error: Processing error`),
+      ).toBe(true);
     });
   });
 
@@ -322,7 +329,11 @@ describe('Event Queue', () => {
         generatedTimestamp: new Date(),
       } as JEvent;
 
-      const mockUser: JUser = { id: 'user1', uniqueIdentifier: 'user1-unique', attributes:{name: 'User 1'} } as JUser;
+      const mockUser: JUser = {
+        id: 'user1',
+        uniqueIdentifier: 'user1-unique',
+        attributes: { name: 'User 1' },
+      } as JUser;
 
       getHandlersForEventTypeStub.returns(['task1']);
       executeEventForUsersStub.resolves();
@@ -343,7 +354,11 @@ describe('Event Queue', () => {
         generatedTimestamp: new Date(),
       } as JEvent;
 
-      const mockUser: JUser = { id: 'user1', uniqueIdentifier: 'user1-unique', attributes:{name: 'User 1'} } as JUser;
+      const mockUser: JUser = {
+        id: 'user1',
+        uniqueIdentifier: 'user1-unique',
+        attributes: { name: 'User 1' },
+      } as JUser;
 
       getHandlersForEventTypeStub.returns(['rule1']);
       executeEventForUsersStub.resolves();
@@ -364,7 +379,11 @@ describe('Event Queue', () => {
         generatedTimestamp: new Date(),
       } as JEvent;
 
-      const mockUser: JUser = { id: 'user1', uniqueIdentifier: 'user1-unique', attributes:{name: 'User 1'} } as JUser;
+      const mockUser: JUser = {
+        id: 'user1',
+        uniqueIdentifier: 'user1-unique',
+        attributes: { name: 'User 1' },
+      } as JUser;
 
       getHandlersForEventTypeStub.returns(['unknown_handler']);
       executeEventForUsersStub.resolves();
@@ -385,7 +404,11 @@ describe('Event Queue', () => {
         generatedTimestamp: new Date(),
       } as JEvent;
 
-      const mockUser: JUser = { id: 'user1', uniqueIdentifier: 'user1-unique', attributes:{name: 'User 1'} } as JUser;
+      const mockUser: JUser = {
+        id: 'user1',
+        uniqueIdentifier: 'user1-unique',
+        attributes: { name: 'User 1' },
+      } as JUser;
 
       getHandlersForEventTypeStub.returns(['task1']);
       executeEventForUsersStub.resolves();
@@ -501,9 +524,9 @@ describe('Event Queue', () => {
       expect(addItemToCollectionStub.calledWith('archived_events', mockEvent)).toBe(true);
       expect(removeItemFromCollectionStub.calledWith('event_queue', 'event1')).toBe(true);
 
-      expect(logDevStub.calledWith(
-        `Event of type "TEST_EVENT" with ID: event1 archived successfully.`
-      )).toBe(true);
+      expect(
+        logDevStub.calledWith(`Event of type "TEST_EVENT" with ID: event1 archived successfully.`),
+      ).toBe(true);
     });
 
     it('should handle archiving errors', async () => {
@@ -524,9 +547,9 @@ describe('Event Queue', () => {
 
       await EventQueue.processEventQueue();
 
-      expect(logErrorStub.calledWith(
-        `Failed to archive event "TEST_EVENT" with ID: event1: ${error}`
-      )).toBe(true);
+      expect(
+        logErrorStub.calledWith(`Failed to archive event "TEST_EVENT" with ID: event1: ${error}`),
+      ).toBe(true);
     });
 
     it('should handle events without ID', async () => {
@@ -543,9 +566,9 @@ describe('Event Queue', () => {
 
       await EventQueue.processEventQueue();
 
-      expect(logErrorStub.calledWith(
-        'Event "[object Object]" has no ID. Skipping archiving.'
-      )).toBe(true);
+      expect(
+        logErrorStub.calledWith('Event "[object Object]" has no ID. Skipping archiving.'),
+      ).toBe(true);
     });
   });
 });

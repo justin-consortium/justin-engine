@@ -1,7 +1,4 @@
-import {
-  JUser,
-  createLogger,
-} from '@just-in/core';
+import { JUser, createLogger } from '@just-in/core';
 import type { JEvent } from './event.type';
 import { EventHandlerManager } from './event-handler-manager';
 import { getTaskByName, executeTask } from '../handlers/task.manager';
@@ -21,7 +18,7 @@ const Log = createLogger({
  *
  * No DB, no queue — pure in-memory execution.
  */
-export async function executeEventForUsers(
+async function executeEventForUsers(
   event: JEvent,
   users: JUser[],
   handlerManager: EventHandlerManager,
@@ -95,3 +92,5 @@ export async function executeEventForUsers(
     }
   }
 }
+
+export { executeEventForUsers };

@@ -7,13 +7,19 @@ export const initializeDataManagerMock = () => {
     mockGetInitializationStatus: sinon
       .stub(DataManager.prototype, 'getInitializationStatus')
       .returns(true),
-    mockCheckInitialization: sinon.stub(DataManager.prototype, 'checkInitialization').callsFake(() => {
-      // Simulate successful check
-    }),
+    mockCheckInitialization: sinon
+      .stub(DataManager.prototype, 'checkInitialization')
+      .callsFake(() => {
+        // Simulate successful check
+      }),
     mockAddItemToCollection: sinon.stub(DataManager.prototype, 'addItemToCollection').resolves(),
     mockGetAllInCollection: sinon.stub(DataManager.prototype, 'getAllInCollection').resolves([]),
-    mockRemoveItemFromCollection: sinon.stub(DataManager.prototype, 'removeItemFromCollection').resolves(true),
-    mockUpdateItemByIdInCollection: sinon.stub(DataManager.prototype, 'updateItemByIdInCollection').resolves(),
+    mockRemoveItemFromCollection: sinon
+      .stub(DataManager.prototype, 'removeItemFromCollection')
+      .resolves(true),
+    mockUpdateItemByIdInCollection: sinon
+      .stub(DataManager.prototype, 'updateItemByIdInCollection')
+      .resolves(),
     mockClearCollection: sinon.stub(DataManager.prototype, 'clearCollection').resolves(),
     mockClient: { isConnected: true }, // Simulate a connected client
     resetDataManagerMocks: () => {
@@ -27,6 +33,5 @@ export const initializeDataManagerMock = () => {
 
   return dataManagerMock;
 };
-
 
 export type DataManagerMocksType = ReturnType<typeof initializeDataManagerMock>;

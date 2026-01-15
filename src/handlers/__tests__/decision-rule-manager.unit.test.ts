@@ -9,14 +9,11 @@ import {
   DecisionRuleRegistration,
   DecisionRuleStep,
 } from '../handler.type';
-import {
-  initializeLoggerMocks,
-  LoggerMocksType,
-} from '../../__tests__/mocks/logger.mock';
+import { initializeLoggerMocks, LoggerMocksType } from '../../__tests__/mocks/logger.mock';
 import { executeStep } from '../steps.helpers';
 import { JEvent } from '../../event/event.type';
 import { JUser } from '../../user-manager/user.type';
-import {handleDecisionRuleResult} from "../result-recorder";
+import { handleDecisionRuleResult } from '../result-recorder';
 
 jest.mock('../result-recorder');
 jest.mock('../steps.helpers');
@@ -48,9 +45,7 @@ describe('DecisionRuleManager', () => {
       expect(retrievedRule).toBeDefined();
       expect(retrievedRule!.name).toBe(mockRule.name);
       expect(
-        loggerMock.mockLogInfo.calledWith(
-          'Decision rule "mockRule" registered successfully.'
-        )
+        loggerMock.mockLogInfo.calledWith('Decision rule "mockRule" registered successfully.'),
       ).toBe(true);
     });
   });
@@ -95,7 +90,7 @@ describe('DecisionRuleManager', () => {
     const mockUser: JUser = {
       id: 'user123',
       uniqueIdentifier: 'user123',
-      attributes: {preferredName: 'Test User'},
+      attributes: { preferredName: 'Test User' },
     };
 
     it('should log success and record results when all steps succeed', async () => {
@@ -116,13 +111,13 @@ describe('DecisionRuleManager', () => {
 
       expect(
         loggerMock.mockLogDev.calledWith(
-          'Starting decision rule "testRule" for user "user123" in event "MOCK_EVENT" with ID: event123.'
-        )
+          'Starting decision rule "testRule" for user "user123" in event "MOCK_EVENT" with ID: event123.',
+        ),
       ).toBe(true);
       expect(
         loggerMock.mockLogInfo.calledWith(
-          'Decision rule "testRule" completed for user "user123" in event "MOCK_EVENT": finished.'
-        )
+          'Decision rule "testRule" completed for user "user123" in event "MOCK_EVENT": finished.',
+        ),
       ).toBe(true);
 
       expect(handleDecisionRuleResult).toHaveBeenCalledWith({
@@ -137,9 +132,7 @@ describe('DecisionRuleManager', () => {
       });
     });
 
-
     it('should skip further steps if a step fails', async () => {
-
       (executeStep as jest.Mock).mockResolvedValueOnce({
         step: DecisionRuleStep.SHOULD_ACTIVATE,
         result: { status: 'failure' },
@@ -158,8 +151,8 @@ describe('DecisionRuleManager', () => {
 
       expect(
         loggerMock.mockLogError.calledWith(
-          `Error processing decision rule "testRule" for user "user123" in event "MOCK_EVENT": ${mockError}`
-        )
+          `Error processing decision rule "testRule" for user "user123" in event "MOCK_EVENT": ${mockError}`,
+        ),
       ).toBe(true);
       expect(handleDecisionRuleResult).toHaveBeenCalled();
     });

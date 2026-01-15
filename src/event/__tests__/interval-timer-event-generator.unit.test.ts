@@ -13,7 +13,7 @@ describe('IntervalTimerEventGenerator', () => {
   beforeEach(() => {
     // Setup fake timers
     clock = sinon.useFakeTimers();
-    
+
     // Reset stubs
     publishEventStub.reset();
   });
@@ -21,7 +21,7 @@ describe('IntervalTimerEventGenerator', () => {
   afterEach(() => {
     // Restore timers
     clock.restore();
-    
+
     // Stop generator if it's running
     if (generator) {
       generator.stop();
@@ -44,7 +44,7 @@ describe('IntervalTimerEventGenerator', () => {
       const options: IntervalTimerEventGeneratorOptions = {
         simulatedStartDate: new Date('2023-01-01T00:00:00Z'),
         simulatedTickDurationInMs: 50,
-        simulatedTickCountMax: 5
+        simulatedTickCountMax: 5,
       };
 
       generator = new IntervalTimerEventGenerator(1000, 'TEST_EVENT', options);
@@ -54,7 +54,7 @@ describe('IntervalTimerEventGenerator', () => {
 
     it('should use default simulated options when not provided', () => {
       const options: IntervalTimerEventGeneratorOptions = {
-        simulatedStartDate: new Date('2023-01-01T00:00:00Z')
+        simulatedStartDate: new Date('2023-01-01T00:00:00Z'),
       };
 
       generator = new IntervalTimerEventGenerator(1000, 'TEST_EVENT', options);
@@ -108,7 +108,7 @@ describe('IntervalTimerEventGenerator', () => {
   describe('start', () => {
     it('should start timer and publish events at regular intervals', () => {
       generator = new IntervalTimerEventGenerator(1000, 'TEST_EVENT');
-      
+
       generator.start();
 
       // Advance time by 1 second
@@ -127,7 +127,7 @@ describe('IntervalTimerEventGenerator', () => {
     it('should use current timestamp for real-time events', () => {
       const startTime = new Date('2023-01-01T12:00:00Z');
       clock.setSystemTime(startTime);
-      
+
       generator = new IntervalTimerEventGenerator(1000, 'TEST_EVENT');
       generator.start();
 
@@ -143,7 +143,7 @@ describe('IntervalTimerEventGenerator', () => {
       const options: IntervalTimerEventGeneratorOptions = {
         simulatedStartDate: startDate,
         simulatedTickDurationInMs: 100,
-        simulatedTickCountMax: 3
+        simulatedTickCountMax: 3,
       };
 
       generator = new IntervalTimerEventGenerator(1000, 'TEST_EVENT', options);
@@ -172,7 +172,7 @@ describe('IntervalTimerEventGenerator', () => {
       const options: IntervalTimerEventGeneratorOptions = {
         simulatedStartDate: new Date('2023-01-01T00:00:00Z'),
         simulatedTickDurationInMs: 100,
-        simulatedTickCountMax: 2
+        simulatedTickCountMax: 2,
       };
 
       generator = new IntervalTimerEventGenerator(1000, 'TEST_EVENT', options);
@@ -194,7 +194,7 @@ describe('IntervalTimerEventGenerator', () => {
     it('should use default simulated tick count max when not specified', () => {
       const options: IntervalTimerEventGeneratorOptions = {
         simulatedStartDate: new Date('2023-01-01T00:00:00Z'),
-        simulatedTickDurationInMs: 100
+        simulatedTickDurationInMs: 100,
       };
 
       generator = new IntervalTimerEventGenerator(1000, 'TEST_EVENT', options);
@@ -216,7 +216,7 @@ describe('IntervalTimerEventGenerator', () => {
       const options: IntervalTimerEventGeneratorOptions = {
         simulatedStartDate: new Date('2023-01-01T00:00:00Z'),
         simulatedTickDurationInMs: 100,
-        simulatedTickCountMax: undefined
+        simulatedTickCountMax: undefined,
       };
 
       generator = new IntervalTimerEventGenerator(1000, 'TEST_EVENT', options);
@@ -250,7 +250,7 @@ describe('IntervalTimerEventGenerator', () => {
 
     it('should handle stopping when not started', () => {
       generator = new IntervalTimerEventGenerator(1000, 'TEST_EVENT');
-      
+
       // Should not throw error
       expect(() => generator.stop()).not.toThrow();
     });
@@ -267,15 +267,15 @@ describe('IntervalTimerEventGenerator', () => {
   describe('integration scenarios', () => {
     it('should handle rapid start/stop cycles', () => {
       generator = new IntervalTimerEventGenerator(1000, 'TEST_EVENT');
-      
+
       generator.start();
       clock.tick(500); // Half way to first event
       generator.stop();
-      
+
       generator.start();
       clock.tick(1000); // Should trigger event
       expect(publishEventStub.calledOnce).toBe(true);
-      
+
       generator.stop();
     });
 
@@ -286,10 +286,10 @@ describe('IntervalTimerEventGenerator', () => {
       // Should trigger every 500ms
       clock.tick(500);
       expect(publishEventStub.calledOnce).toBe(true);
-      
+
       clock.tick(500);
       expect(publishEventStub.calledTwice).toBe(true);
-      
+
       generator.stop();
     });
 
@@ -297,7 +297,7 @@ describe('IntervalTimerEventGenerator', () => {
       const options: IntervalTimerEventGeneratorOptions = {
         simulatedStartDate: new Date('2023-01-01T00:00:00Z'),
         simulatedTickDurationInMs: 200,
-        simulatedTickCountMax: 3
+        simulatedTickCountMax: 3,
       };
 
       generator = new IntervalTimerEventGenerator(3000, 'SLOW_EVENT', options);
@@ -322,18 +322,17 @@ describe('IntervalTimerEventGenerator', () => {
   });
 
   describe('edge cases', () => {
-
     it('should handle very large interval duration', () => {
       generator = new IntervalTimerEventGenerator(86400000, 'DAILY_EVENT'); // 24 hours
       generator.start();
 
       // Should not trigger immediately
       expect(publishEventStub.called).toBe(false);
-      
+
       // Should trigger after 24 hours
       clock.tick(86400000);
       expect(publishEventStub.calledOnce).toBe(true);
-      
+
       generator.stop();
     });
 
@@ -342,7 +341,7 @@ describe('IntervalTimerEventGenerator', () => {
       const options: IntervalTimerEventGeneratorOptions = {
         simulatedStartDate: pastDate,
         simulatedTickDurationInMs: 100,
-        simulatedTickCountMax: 2
+        simulatedTickCountMax: 2,
       };
 
       generator = new IntervalTimerEventGenerator(1000, 'PAST_EVENT', options);
@@ -352,7 +351,7 @@ describe('IntervalTimerEventGenerator', () => {
       expect(publishEventStub.calledOnce).toBe(true);
       const timestamp = publishEventStub.firstCall.args[1] as Date;
       expect(timestamp.getTime()).toBe(pastDate.getTime());
-      
+
       generator.stop();
     });
 
@@ -361,7 +360,7 @@ describe('IntervalTimerEventGenerator', () => {
       const options: IntervalTimerEventGeneratorOptions = {
         simulatedStartDate: futureDate,
         simulatedTickDurationInMs: 100,
-        simulatedTickCountMax: 2
+        simulatedTickCountMax: 2,
       };
 
       generator = new IntervalTimerEventGenerator(1000, 'FUTURE_EVENT', options);
@@ -371,8 +370,8 @@ describe('IntervalTimerEventGenerator', () => {
       expect(publishEventStub.calledOnce).toBe(true);
       const timestamp = publishEventStub.firstCall.args[1] as Date;
       expect(timestamp.getTime()).toBe(futureDate.getTime());
-      
+
       generator.stop();
     });
   });
-}); 
+});
