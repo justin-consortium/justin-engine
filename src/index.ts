@@ -1,6 +1,6 @@
 // Engine entrypoints
-export { JustInWrapper } from './JustInWrapper';
-export { JustInLite } from './JustInLite';
+export { Engine } from './ServerEngine';
+export { EngineLite } from './ServerlessEngine';
 
 // Types
 export type { JEvent } from './event/event.type';

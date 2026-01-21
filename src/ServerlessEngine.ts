@@ -40,14 +40,14 @@ const Log: Logger<BaseSeverity> = createLogger<BaseSeverity>({
 });
 
 /**
- * JustInLiteWrapper provides a minimal, serverless-oriented interface for 3rd-party apps:
+ * ServerlessEngine provides a minimal, serverless-oriented interface for 3rd-party apps:
  * - configure logger & result writers
  * - register tasks, decision rules, and event handlers
  * - keep users in-memory for the current warm instance
  * - run registered events immediately (no DB/queue)
  */
-export class JustInLiteWrapper {
-  protected static instance: JustInLiteWrapper | null = null;
+export class ServerlessEngine {
+  protected static instance: ServerlessEngine | null = null;
 
   /** In-memory idempotency (per warm instance only). */
   private processedKeys = new Set<string>();
@@ -63,11 +63,11 @@ export class JustInLiteWrapper {
   }
 
   /** Returns the singleton Lite instance. */
-  public static getInstance(): JustInLiteWrapper {
-    if (!JustInLiteWrapper.instance) {
-      JustInLiteWrapper.instance = new JustInLiteWrapper();
+  public static getInstance(): ServerlessEngine {
+    if (!ServerlessEngine.instance) {
+      ServerlessEngine.instance = new ServerlessEngine();
     }
-    return JustInLiteWrapper.instance;
+    return ServerlessEngine.instance;
   }
 
   /**
@@ -82,7 +82,7 @@ export class JustInLiteWrapper {
       this.processedKeys.clear();
       this.users.clear();
       this.eventHandlerManager.clearEventHandlers();
-      JustInLiteWrapper.instance = null;
+      ServerlessEngine.instance = null;
     }
   }
 
@@ -92,8 +92,8 @@ export class JustInLiteWrapper {
    * Safe to call multiple times.
    */
   public static async killInstance(): Promise<void> {
-    if (JustInLiteWrapper.instance) {
-      await JustInLiteWrapper.instance.killInstance();
+    if (ServerlessEngine.instance) {
+      await ServerlessEngine.instance.killInstance();
       return;
     }
     // No instance — still clear any registered handlers to avoid leaks across tests.
@@ -302,4 +302,4 @@ export class JustInLiteWrapper {
   }
 }
 
-export const JustInLite = () => JustInLiteWrapper.getInstance();
+export const EngineLite = () => ServerlessEngine.getInstance();

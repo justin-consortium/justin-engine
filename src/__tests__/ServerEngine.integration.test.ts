@@ -1,5 +1,5 @@
 import { MongoMemoryReplSet } from "mongodb-memory-server";
-import { JustInWrapper } from "../JustInWrapper";
+import { ServerEngine } from "src/ServerEngine";
 import { Log } from "../logger/logger-manager";
 import { EventHandlerManager } from "../event/event-handler-manager";
 import { UserManager } from "../user-manager/user-manager";
@@ -11,13 +11,13 @@ import { TaskRegistration, DecisionRuleRegistration } from "../handlers/handler.
 import { JUser } from "../user-manager/user.type";
 
 function resetJustinWrapperSingleton(): void {
-  const wrapperModule = require('../JustInWrapper');
+  const wrapperModule = require('src/ServerEngine');
   wrapperModule.JustInWrapper['instance'] = null;
 }
 
 describe('JustInWrapper Integration', () => {
   let mongoServer: MongoMemoryReplSet;
-  let justIn: JustInWrapper;
+  let justIn: ServerEngine;
   let dataManager: DataManager;
   let eventHandlerManager: EventHandlerManager;
 
@@ -32,7 +32,7 @@ describe('JustInWrapper Integration', () => {
   });
 
   beforeEach(async () => {
-    justIn = JustInWrapper.getInstance();
+    justIn = ServerEngine.getInstance();
     dataManager = DataManager.getInstance();
     eventHandlerManager = EventHandlerManager.getInstance();
     await justIn.init(DBType.MONGO);
@@ -62,15 +62,15 @@ describe('JustInWrapper Integration', () => {
 
   describe('Singleton Pattern', () => {
     it('should maintain singleton instance', () => {
-      const instance1 = JustInWrapper.getInstance();
-      const instance2 = JustInWrapper.getInstance();
+      const instance1 = ServerEngine.getInstance();
+      const instance2 = ServerEngine.getInstance();
       expect(instance1).toBe(instance2);
     });
 
     it('should handle JustIn function correctly', () => {
-      const instance1 = JustInWrapper.getInstance();
+      const instance1 = ServerEngine.getInstance();
       const instance2 = (() => {
-        const { JustIn } = require('../JustInWrapper');
+        const { JustIn } = require('src/ServerEngine');
         return JustIn();
       })();
       expect(instance1).toBe(instance2);
@@ -115,7 +115,7 @@ describe('JustInWrapper Integration', () => {
 
     it('should update a user in database successfully', async () => {
       const user = { uniqueIdentifier: 'user1', initialAttributes: { name: 'User 1', email: 'user1@test.com' } };
-      
+
       const addedUser:JUser = await justIn.addUser(user) as JUser;
       expect(addedUser).toBeDefined();
       expect(addedUser.uniqueIdentifier).toBe(user.uniqueIdentifier);
@@ -126,7 +126,7 @@ describe('JustInWrapper Integration', () => {
       expect(updatedUser).toBeDefined();
       expect(updatedUser.uniqueIdentifier).toBe(user.uniqueIdentifier);
       expect(updatedUser.attributes).toEqual(attributesToUpdate);
-    
+
       const theUser: JUser = await justIn.getUser(user.uniqueIdentifier) as JUser;
       expect(theUser).toBeDefined();
       expect(theUser.uniqueIdentifier).toBe(user.uniqueIdentifier);
@@ -135,7 +135,7 @@ describe('JustInWrapper Integration', () => {
 
     it('should delete a user in database successfully', async () => {
       const user = { uniqueIdentifier: 'user1', initialAttributes: { name: 'User 1', email: 'user1@test.com' } };
-      
+
       const addedUser:JUser = await justIn.addUser(user) as JUser;
       expect(addedUser).toBeDefined();
       expect(addedUser.uniqueIdentifier).toBe(user.uniqueIdentifier);

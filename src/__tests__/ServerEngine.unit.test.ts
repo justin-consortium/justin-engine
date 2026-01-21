@@ -1,5 +1,5 @@
 import sinon from 'sinon';
-import { JustInWrapper } from '../JustInWrapper';
+import { ServerEngine } from 'src/ServerEngine';
 import DataManager from '../data-manager/data-manager';
 import { EventHandlerManager } from '../event/event-handler-manager';
 import { UserManager } from '../user-manager/user-manager';
@@ -57,8 +57,8 @@ const mockIntervalTimerEventGenerator = {
   stop: sinon.stub(),
 };
 
-// JustInWrapper 
-const justInWrapper: JustInWrapper = JustInWrapper.getInstance();
+// JustInWrapper
+const justInWrapper: ServerEngine = ServerEngine.getInstance();
 
 // Stub the IntervalTimerEventGenerator constructor
 const intervalTimerEventGeneratorStub = sinon.stub().returns(mockIntervalTimerEventGenerator);
@@ -121,19 +121,19 @@ describe('JustInWrapper', () => {
 
   describe('getInstance', () => {
     it('should return singleton instance', () => {
-      const instance1 = JustInWrapper.getInstance();
-      const instance2 = JustInWrapper.getInstance();
+      const instance1 = ServerEngine.getInstance();
+      const instance2 = ServerEngine.getInstance();
 
       expect(instance1).toBe(instance2);
-      expect(instance1).toBeInstanceOf(JustInWrapper);
+      expect(instance1).toBeInstanceOf(ServerEngine);
     });
 
     it('should create new instance when none exists', () => {
       // Kill existing instance
-      (JustInWrapper as any).killInstance();
-      
-      const instance = JustInWrapper.getInstance();
-      expect(instance).toBeInstanceOf(JustInWrapper);
+      (ServerEngine as any).killInstance();
+
+      const instance = ServerEngine.getInstance();
+      expect(instance).toBeInstanceOf(ServerEngine);
     });
   });
 
@@ -141,7 +141,7 @@ describe('JustInWrapper', () => {
     beforeEach(async () => {
       await justInWrapper.shutdown();
     });
-    
+
     it('should initialize database successfully', async () => {
       Log.dev('In init: should initialize database successfully');
       await justInWrapper.init();
@@ -163,7 +163,7 @@ describe('JustInWrapper', () => {
     it('should not reinitialize if already initialized', async () => {
       // First initialization
       await justInWrapper.init();
-      
+
       // Reset stub to check if called again
       dataManagerInitStub.reset();
       userManagerInitStub.reset();
@@ -318,7 +318,7 @@ describe('JustInWrapper', () => {
       justInWrapper.createIntervalTimerEventGenerator(eventTypeName, intervalInMs, options);
 
       const intervalTimerEventGenerators = justInWrapper.getIntervalTimerEventGenerators();
-      expect(intervalTimerEventGenerators.size).toBe(1);    
+      expect(intervalTimerEventGenerators.size).toBe(1);
       expect(intervalTimerEventGenerators.get(eventTypeName)).toBeDefined();
     });
   });
@@ -360,7 +360,7 @@ describe('JustInWrapper', () => {
       const mockGenerators = new Map();
       mockGenerators.set('EVENT1', mockIntervalTimerEventGenerator);
       mockGenerators.set('EVENT2', mockIntervalTimerEventGenerator);
-      
+
       (justInWrapper as any).intervalTimerEventGenerators = mockGenerators;
 
       await justInWrapper.startEngine();
@@ -503,11 +503,11 @@ describe('JustInWrapper', () => {
 
   describe('JustIn instance', () => {
     it('should return JustInWrapper instance', () => {
-      const { JustIn } = require('../JustInWrapper');
+      const { JustIn } = require('src/ServerEngine');
       const instance = JustIn();
 
-      expect(instance).toBeInstanceOf(JustInWrapper);
-      expect(instance).toBe(JustInWrapper.getInstance());
+      expect(instance).toBeInstanceOf(ServerEngine);
+      expect(instance).toBe(ServerEngine.getInstance());
     });
   });
 
@@ -543,27 +543,27 @@ describe('JustInWrapper', () => {
     });
 
     it('should handle multiple task and decision rule registrations', () => {
-      const task1: TaskRegistration = { 
-        name: 'task1', 
-        beforeExecution: () => {}, 
+      const task1: TaskRegistration = {
+        name: 'task1',
+        beforeExecution: () => {},
         shouldActivate: () => ({ status: 'success' }),
         doAction: () => ({ status: 'success' }),
-        afterExecution: () => {} 
+        afterExecution: () => {}
       };
-      const task2: TaskRegistration = { 
-        name: 'task2', 
-        beforeExecution: () => {}, 
+      const task2: TaskRegistration = {
+        name: 'task2',
+        beforeExecution: () => {},
         shouldActivate: () => ({ status: 'success' }),
         doAction: () => ({ status: 'success' }),
-        afterExecution: () => {} 
+        afterExecution: () => {}
       };
-      const rule1: DecisionRuleRegistration = { 
-        name: 'rule1', 
-        beforeExecution: () => {}, 
+      const rule1: DecisionRuleRegistration = {
+        name: 'rule1',
+        beforeExecution: () => {},
         shouldActivate: () => ({ status: 'success' }),
         doAction: () => ({ status: 'success' }),
         selectAction: () => ({ status: 'success' }),
-        afterExecution: () => {} 
+        afterExecution: () => {}
       };
 
       justInWrapper.registerTask(task1);
@@ -574,4 +574,4 @@ describe('JustInWrapper', () => {
       expect(registerDecisionRuleStub.calledOnce).toBe(true);
     });
   });
-}); 
+});

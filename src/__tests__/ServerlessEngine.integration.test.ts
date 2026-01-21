@@ -1,5 +1,5 @@
 import sinon from 'sinon';
-import { JustInLite, JustInLiteWrapper } from '../JustInLite';
+import { JustInLite, JustInLiteWrapper } from 'src/ServerlessEngine';
 import { EventHandlerManager } from '../event/event-handler-manager';
 import * as EventExecutor from '../event/event-executor';
 import { Log } from '../logger/logger-manager';

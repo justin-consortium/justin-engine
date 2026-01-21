@@ -41,11 +41,11 @@ const baseLoggingContext: Pick<LoggerConfig, 'context'> = {
 };
 
 /**
- * JustInWrapper class provides a unified interface for managing application-level configurations,
+ * ServerEngine class provides a unified interface for managing application-level configurations,
  * event registrations, data manager initialization, and orchestrating the event queue for processing.
  */
-export class JustInWrapper {
-  protected static instance: JustInWrapper | null = null;
+export class ServerEngine {
+  protected static instance: ServerEngine | null = null;
   private dataManager: DataManager = DataManager.getInstance();
   private eventHandlerManager: EventHandlerManager =
     EventHandlerManager.getInstance();
@@ -61,21 +61,21 @@ export class JustInWrapper {
 
   /**
    * Retrieves the singleton instance of JustInWrapper.
-   * @returns {JustInWrapper} The singleton instance.
+   * @returns {ServerEngine} The singleton instance.
    */
-  public static getInstance(): JustInWrapper {
-    if (!JustInWrapper.instance) {
-      JustInWrapper.instance = new JustInWrapper();
+  public static getInstance(): ServerEngine {
+    if (!ServerEngine.instance) {
+      ServerEngine.instance = new ServerEngine();
     }
-    return JustInWrapper.instance;
+    return ServerEngine.instance;
   }
 
   /**
    * Deletes the singleton instance of JustInWrapper.
    */
   public static killInstance(): void {
-    if (JustInWrapper.instance) {
-      JustInWrapper.instance = null;
+    if (ServerEngine.instance) {
+      ServerEngine.instance = null;
     }
   }
 
@@ -366,6 +366,6 @@ export class JustInWrapper {
   }
 }
 
-export const JustIn = () => {
-  return JustInWrapper.getInstance();
+export const Engine = () => {
+  return ServerEngine.getInstance();
 };
