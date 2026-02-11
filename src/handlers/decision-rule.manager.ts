@@ -1,4 +1,6 @@
-import { createLogger, JUser } from '@just-in/core';
+import { createLogger } from '@just-in/core';
+import type { JUser } from '@just-in/core';
+
 import {
   DecisionRule,
   HandlerType,
@@ -8,7 +10,7 @@ import {
 } from './handler.type';
 import { JEvent } from '../event/event.type';
 import { executeStep } from './steps.helpers';
-import { handleDecisionRuleResult } from './result-recorder';
+import {handleDecisionRuleResult} from './result-recorder';
 
 const Log = createLogger({
   context: {
@@ -123,12 +125,25 @@ export async function executeDecisionRule(
       timestamp: new Date(),
     });
   } finally {
-    handleDecisionRuleResult({
-      event,
-      name: rule.name,
-      steps: results,
-      user,
-    });
+    if (results.length > 0) {
+      try{
+        await handleDecisionRuleResult({
+          event,
+          name: rule.name,
+          steps: results,
+          user,
+        });
+      } catch(error) {
+        Log.error(
+          'Error executing decision rule for user.',
+          { taskName: rule.name, user, event, error, });
+        results.push({
+          step: 'unknown',
+          result: { status: 'error', error, },
+          timestamp: new Date(),
+        });
+      }
+    }
     Log.info('Decision rule completed.', {
       ruleName: rule.name,
       user,
@@ -137,3 +152,10 @@ export async function executeDecisionRule(
     });
   }
 }
+
+/**
+ * Clears all registered decision rules (primarily for tests).
+ */
+export const _clearRegisteredDecisionRules = (): void => {
+  decisionRules.clear();
+};
