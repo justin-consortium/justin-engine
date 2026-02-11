@@ -1,45 +1,54 @@
+import sinon from 'sinon';
+
+import { makeEngineSandbox } from '../../testing';
+import { makeUser } from '@just-in/core/testing';
+
 import {
   executeDecisionRule,
   getDecisionRuleByName,
   registerDecisionRule,
 } from '../decision-rule.manager';
+
 import {
   HandlerType,
-  DecisionRule,
-  DecisionRuleRegistration,
   DecisionRuleStep,
+  type DecisionRuleRegistration,
+  type DecisionRule,
 } from '../handler.type';
-import {
-  initializeLoggerMocks,
-  LoggerMocksType,
-} from '../../__tests__/mocks/logger.mock';
-import { executeStep } from '../steps.helpers';
-import { JEvent } from '../../event/event.type';
-import { JUser } from '../../user-manager/user.type';
-import {handleDecisionRuleResult} from "../result-recorder";
 
-jest.mock('../result-recorder');
-jest.mock('../steps.helpers');
+import * as StepsHelpers from '../steps.helpers';
+import * as ResultRecorder from '../result-recorder';
+
+import type { JEvent } from '../../event/event.type';
+import type { JUser } from '@just-in/core';
 
 describe('DecisionRuleManager', () => {
-  let loggerMock: LoggerMocksType;
+  const engineSandbox = makeEngineSandbox();
 
-  beforeEach(() => {
-    loggerMock = initializeLoggerMocks();
-    jest.clearAllMocks();
+  let executeStepStub: sinon.SinonStub;
+  let handleDecisionRuleResultStub: sinon.SinonStub;
+
+  beforeEach(async () => {
+    await engineSandbox.reset();
+
+    executeStepStub = engineSandbox.sb.stub(StepsHelpers, 'executeStep');
+    handleDecisionRuleResultStub = engineSandbox.sb.stub(
+      ResultRecorder,
+      'handleDecisionRuleResult',
+    );
   });
 
-  afterEach(() => {
-    loggerMock.restoreLoggerMocks();
+  afterEach(async () => {
+    await engineSandbox.restore();
   });
 
   describe('registerDecisionRule', () => {
-    it('should register a decision rule and log success', () => {
+    it('registers a decision rule that can be retrieved by name', () => {
       const mockRule: DecisionRuleRegistration = {
         name: 'mockRule',
-        shouldActivate: jest.fn(),
-        selectAction: jest.fn(),
-        doAction: jest.fn(),
+        shouldActivate: async () => ({ status: 'success' } as any),
+        selectAction: async () => ({ status: 'success' } as any),
+        doAction: async () => ({ status: 'success' } as any),
       };
 
       registerDecisionRule(mockRule);
@@ -47,33 +56,31 @@ describe('DecisionRuleManager', () => {
       const retrievedRule = getDecisionRuleByName(mockRule.name);
       expect(retrievedRule).toBeDefined();
       expect(retrievedRule!.name).toBe(mockRule.name);
-      expect(
-        loggerMock.mockLogInfo.calledWith(
-          'Decision rule "mockRule" registered successfully.'
-        )
-      ).toBe(true);
+      expect(retrievedRule!.type).toBe(HandlerType.DECISION_RULE);
     });
   });
 
   describe('getDecisionRuleByName', () => {
-    it('should return undefined for a non-existent rule', () => {
+    it('returns undefined for a non-existent rule', () => {
       const result = getDecisionRuleByName('nonExistentRule');
       expect(result).toBeUndefined();
     });
 
-    it('should retrieve a registered rule', () => {
+    it('retrieves a registered rule', () => {
       const mockRule: DecisionRuleRegistration = {
         name: 'existingRule',
-        shouldActivate: jest.fn(),
-        selectAction: jest.fn(),
-        doAction: jest.fn(),
+        shouldActivate: async () => ({ status: 'success' } as any),
+        selectAction: async () => ({ status: 'success' } as any),
+        doAction: async () => ({ status: 'success' } as any),
       };
 
       registerDecisionRule(mockRule);
 
       const result = getDecisionRuleByName(mockRule.name);
+
       expect(result).toBeDefined();
       expect(result!.name).toBe(mockRule.name);
+      expect(result!.type).toBe(HandlerType.DECISION_RULE);
     });
   });
 
@@ -81,9 +88,9 @@ describe('DecisionRuleManager', () => {
     const mockRule: DecisionRule = {
       name: 'testRule',
       type: HandlerType.DECISION_RULE,
-      shouldActivate: jest.fn(),
-      selectAction: jest.fn(),
-      doAction: jest.fn(),
+      shouldActivate: async () => ({ status: 'success' } as any),
+      selectAction: async () => ({ status: 'success' } as any),
+      doAction: async () => ({ status: 'success' } as any),
     };
 
     const mockEvent: JEvent = {
@@ -92,40 +99,34 @@ describe('DecisionRuleManager', () => {
       generatedTimestamp: new Date(),
     };
 
-    const mockUser: JUser = {
+    const mockUser: JUser = makeUser({
       id: 'user123',
       uniqueIdentifier: 'user123',
-      attributes: {preferredName: 'Test User'},
-    };
+      attributes: { preferredName: 'Test User' },
+    }) as unknown as JUser;
 
-    it('should log success and record results when all steps succeed', async () => {
-      (executeStep as jest.Mock).mockResolvedValueOnce({
+    it('records results when all steps succeed', async () => {
+      executeStepStub.onCall(0).resolves({
         step: DecisionRuleStep.SHOULD_ACTIVATE,
         result: { status: 'success' },
       });
-      (executeStep as jest.Mock).mockResolvedValueOnce({
+      executeStepStub.onCall(1).resolves({
         step: DecisionRuleStep.SELECT_ACTION,
         result: { status: 'success' },
       });
-      (executeStep as jest.Mock).mockResolvedValueOnce({
+      executeStepStub.onCall(2).resolves({
         step: DecisionRuleStep.DO_ACTION,
         result: { status: 'success' },
       });
 
       await executeDecisionRule(mockRule, mockEvent, mockUser);
 
-      expect(
-        loggerMock.mockLogDev.calledWith(
-          'Starting decision rule "testRule" for user "user123" in event "MOCK_EVENT" with ID: event123.'
-        )
-      ).toBe(true);
-      expect(
-        loggerMock.mockLogInfo.calledWith(
-          'Decision rule "testRule" completed for user "user123" in event "MOCK_EVENT": finished.'
-        )
-      ).toBe(true);
+      expect(executeStepStub.callCount).toBe(3);
 
-      expect(handleDecisionRuleResult).toHaveBeenCalledWith({
+      expect(handleDecisionRuleResultStub.calledOnce).toBe(true);
+      const payload = handleDecisionRuleResultStub.firstCall.args[0];
+
+      expect(payload).toEqual({
         event: mockEvent,
         name: mockRule.name,
         steps: [
@@ -137,31 +138,36 @@ describe('DecisionRuleManager', () => {
       });
     });
 
-
-    it('should skip further steps if a step fails', async () => {
-
-      (executeStep as jest.Mock).mockResolvedValueOnce({
+    it('skips further steps if shouldActivate is not success and does not record a result payload', async () => {
+      executeStepStub.resolves({
         step: DecisionRuleStep.SHOULD_ACTIVATE,
         result: { status: 'failure' },
       });
 
       await executeDecisionRule(mockRule, mockEvent, mockUser);
 
-      expect(executeStep).toHaveBeenCalledTimes(1);
+      expect(executeStepStub.callCount).toBe(1);
+      expect(handleDecisionRuleResultStub.called).toBe(false);
     });
 
-    it('should log an error if an exception occurs during execution', async () => {
-      const mockError = new Error('Execution error');
-      (executeStep as jest.Mock).mockRejectedValueOnce(mockError);
+    it('records results when a step throws, using an "unknown" step marker', async () => {
+      const err = new Error('Execution error');
+      executeStepStub.rejects(err);
 
       await executeDecisionRule(mockRule, mockEvent, mockUser);
 
-      expect(
-        loggerMock.mockLogError.calledWith(
-          `Error processing decision rule "testRule" for user "user123" in event "MOCK_EVENT": ${mockError}`
-        )
-      ).toBe(true);
-      expect(handleDecisionRuleResult).toHaveBeenCalled();
+      expect(executeStepStub.callCount).toBe(1);
+
+      expect(handleDecisionRuleResultStub.calledOnce).toBe(true);
+      const payload = handleDecisionRuleResultStub.firstCall.args[0];
+
+      expect(payload.event).toBe(mockEvent);
+      expect(payload.name).toBe(mockRule.name);
+      expect(payload.user).toBe(mockUser);
+
+      expect(Array.isArray(payload.steps)).toBe(true);
+      expect(payload.steps.length).toBe(1);
+      expect(payload.steps[0].step).toBe('unknown');
     });
   });
 });
