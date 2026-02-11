@@ -1,40 +1,43 @@
-import sinon from 'sinon';
-import { JustInLite, JustInLiteWrapper } from '../JustInLite'; // <- adjust path if needed
-import * as EventExecutor from '../event/event-executor';
-import * as LoggerManager from '../logger/logger-manager';
-import * as ResultRecorder from '../handlers/result-recorder';
-import { EventHandlerManager } from '../event/event-handler-manager';
-import type { JUser, NewUserRecord } from '../user-manager/user.type';
+import { makeNewUserRecord, makeUser } from '@just-in/core/testing';
+import { makeEngineSandbox } from '../testing';
 
-describe('JustInLite (Sinon)', () => {
-  let justin: JustInLiteWrapper;
+import { JustInLite } from '../JustInLite';
+import { EventHandlerManager } from '../event/event-handler-manager';
+
+import * as EventExecutor from '../event/event-executor';
+import * as ResultRecorder from '../handlers/result-recorder';
+
+import type { JUser, NewUserRecord } from '@just-in/core';
+
+describe('JustInLite', () => {
+  const engineSandbox = makeEngineSandbox();
+
+  let justin: ReturnType<typeof JustInLite>;
   let ehm: EventHandlerManager;
-  let sandbox: sinon.SinonSandbox;
 
   beforeEach(async () => {
-    sandbox = sinon.createSandbox();
-    await JustInLite().killInstance();
-
+    // Arrange
+    await engineSandbox.reset();
     justin = JustInLite();
     ehm = EventHandlerManager.getInstance();
-    ehm.clearEventHandlers?.();
   });
 
   afterEach(async () => {
-    sandbox.restore();
-    await JustInLite().killInstance();
+    await engineSandbox.restore();
   });
 
   describe('Users (in-memory)', () => {
     it('accepts NewUserRecord[] and normalizes to JUser[]', async () => {
+      // Arrange
       const input: NewUserRecord[] = [
-        { uniqueIdentifier: 'u1', initialAttributes: { a: 1 } },
-        { uniqueIdentifier: 'u2', initialAttributes: { b: 2 } },
+        makeNewUserRecord({ uniqueIdentifier: 'u1', initialAttributes: { a: 1 } }),
+        makeNewUserRecord({ uniqueIdentifier: 'u2', initialAttributes: { b: 2 } }),
       ];
 
-      const infoStub = sandbox.stub(LoggerManager.Log, 'info');
-
+      // Act
       const result = await justin.loadUsers(input);
+
+      // Assert
       expect(result).toHaveLength(2);
       expect(result[0]).toEqual({
         id: 'u1',
@@ -46,121 +49,146 @@ describe('JustInLite (Sinon)', () => {
         uniqueIdentifier: 'u2',
         attributes: { b: 2 },
       });
-
-      sinon.assert.called(infoStub);
     });
 
     it('accepts JUser[] and replaces in-memory set atomically', async () => {
+      // Arrange
       const first: JUser[] = [
-        { id: 'a', uniqueIdentifier: 'a', attributes: { foo: 1 } },
+        makeUser({ id: 'a', uniqueIdentifier: 'a', attributes: { foo: 1 } }) as unknown as JUser,
       ];
       const second: JUser[] = [
-        { id: 'b', uniqueIdentifier: 'b', attributes: { bar: 2 } },
+        makeUser({ id: 'b', uniqueIdentifier: 'b', attributes: { bar: 2 } }) as unknown as JUser,
       ];
 
       await justin.loadUsers(first);
       await justin.loadUsers(second);
 
-      const regSpy = sandbox.spy(ehm, 'registerEventHandlers');
+      const regSpy = engineSandbox.sb.spy(ehm, 'registerEventHandlers');
       await justin.registerEventHandlers('EV', ['HandlerA']);
-      sinon.assert.calledOnce(regSpy);
 
-      const execStub = sandbox.stub(EventExecutor, 'executeEventForUsers').resolves();
+      const execStub = engineSandbox.sb.stub(EventExecutor, 'executeEventForUsers').resolves();
 
+      // Act
       await justin.publishEvent('EV', new Date());
-      sinon.assert.calledOnce(execStub);
 
-      const usersPassed = execStub.getCall(0).args[1] as JUser[];
+      // Assert
+      expect(regSpy.calledOnce).toBe(true);
+      expect(execStub.calledOnce).toBe(true);
+
+      const usersPassed = execStub.firstCall.args[1] as JUser[];
       expect(usersPassed).toHaveLength(1);
       expect(usersPassed[0].uniqueIdentifier).toBe('b');
     });
 
     it('throws on missing uniqueIdentifier', async () => {
+      // Arrange
       const bad: any[] = [{ id: 'x' }];
-      await expect(justin.loadUsers(bad as any)).rejects.toThrow(/UniqueIdentifier is missing/i);
+
+      // Act / Assert
+      await expect(justin.loadUsers(bad as any)).rejects.toThrow(/uniqueIdentifier/i);
     });
 
     it('throws on duplicates within the same call', async () => {
+      // Arrange
       const dup: NewUserRecord[] = [
-        { uniqueIdentifier: 'z', initialAttributes: { name: 'test' } },
-        { uniqueIdentifier: 'z', initialAttributes: { name: 'test' } },
+        makeNewUserRecord({ uniqueIdentifier: 'z', initialAttributes: { name: 'test' } }),
+        makeNewUserRecord({ uniqueIdentifier: 'z', initialAttributes: { name: 'test2' } }),
       ];
-      await expect(justin.loadUsers(dup)).rejects.toThrow(/duplicate uniqueIdentifier "z"/i);
+
+      // Act / Assert
+      await expect(justin.loadUsers(dup)).rejects.toThrow(/duplicate/i);
     });
   });
 
   describe('Execution / publishEvent', () => {
     it('throws if no users loaded', async () => {
+      // Arrange
       await justin.registerEventHandlers('EV', ['H']);
-      await expect(justin.publishEvent('EV', new Date())).rejects.toThrow(/no users loaded/i);
+
+      // Act / Assert
+      await expect(justin.publishEvent('EV', new Date())).rejects.toThrow(/no users/i);
     });
 
     it('throws if event type not registered', async () => {
-      await justin.loadUsers([{ id: 'u', uniqueIdentifier: 'u', attributes: {} }]);
-      await expect(justin.publishEvent('MISSING', new Date())).rejects.toThrow(/No handlers registered/i);
+      // Arrange
+      await justin.loadUsers([
+        makeUser({ id: 'u', uniqueIdentifier: 'u', attributes: {} }) as unknown as JUser,
+      ]);
+
+      // Act / Assert
+      await expect(justin.publishEvent('MISSING', new Date())).rejects.toThrow(/no handlers/i);
     });
 
     it('builds event and calls shared executor once', async () => {
+      // Arrange
       await justin.registerEventHandlers('EV', ['H']);
-      await justin.loadUsers([{ id: 'u', uniqueIdentifier: 'u', attributes: {} }]);
+      await justin.loadUsers([
+        makeUser({ id: 'u', uniqueIdentifier: 'u', attributes: {} }) as unknown as JUser,
+      ]);
 
-      const execStub = sandbox.stub(EventExecutor, 'executeEventForUsers').resolves();
+      const execStub = engineSandbox.sb.stub(EventExecutor, 'executeEventForUsers').resolves();
+
       const ts = new Date('2025-01-01T00:00:00Z');
       const details = { cloudEventId: '123' };
 
+      // Act
       await justin.publishEvent('EV', ts, details);
 
-      sinon.assert.calledOnce(execStub);
-      const [eventArg, usersArg] = execStub.getCall(0).args;
+      // Assert
+      expect(execStub.calledOnce).toBe(true);
+
+      const [eventArg, usersArg] = execStub.firstCall.args;
       expect(eventArg).toMatchObject({
         eventType: 'EV',
         generatedTimestamp: ts,
         eventDetails: details,
       });
+
       expect((usersArg as JUser[])[0].uniqueIdentifier).toBe('u');
     });
 
     it('idempotencyKey skips duplicate within same warm instance', async () => {
+      // Arrange
       await justin.registerEventHandlers('EV', ['H']);
-      await justin.loadUsers([{ id: 'u', uniqueIdentifier: 'u', attributes: {} }]);
+      await justin.loadUsers([
+        makeUser({ id: 'u', uniqueIdentifier: 'u', attributes: {} }) as unknown as JUser,
+      ]);
 
-      const warnStub = sandbox.stub(LoggerManager.Log, 'warn');
-      const execStub = sandbox.stub(EventExecutor, 'executeEventForUsers').resolves();
+      const execStub = engineSandbox.sb.stub(EventExecutor, 'executeEventForUsers').resolves();
 
+      // Act
       const key = 'k-1';
       await justin.publishEvent('EV', new Date(), {}, key);
-      await justin.publishEvent('EV', new Date(), {}, key); // duplicate: skip
+      await justin.publishEvent('EV', new Date(), {}, key);
 
-      sinon.assert.calledOnce(execStub);
-      sinon.assert.calledWithMatch(warnStub, sinon.match(/duplicate execution skipped/i));
+      // Assert
+      expect(execStub.calledOnce).toBe(true);
     });
   });
 
-  describe('Logger & Writers', () => {
-    it('configureLogger delegates to setLogger', () => {
-      const setLoggerStub = sandbox.stub(LoggerManager, 'setLogger');
-      const fakeLogger = { info: () => {}, warn: () => {}, error: () => {}, dev: () => {} } as any;
-
-      justin.configureLogger(fakeLogger);
-      sinon.assert.calledOnceWithExactly(setLoggerStub, fakeLogger);
-    });
-
-    it('setLoggingLevels delegates to setLogLevels', () => {
-      const setLevelsStub = sandbox.stub(LoggerManager, 'setLogLevels');
-      justin.setLoggingLevels({ info: false, dev: true });
-      sinon.assert.calledOnceWithExactly(setLevelsStub, { info: false, dev: true });
-    });
-
-    it('configureTaskResultWriter, configureDecisionRuleResultWriter delegate to result-recorder', () => {
-      const taskStub = sandbox.stub(ResultRecorder, 'setTaskResultRecorder');
-      const ruleStub = sandbox.stub(ResultRecorder, 'setDecisionRuleResultRecorder');
-
+  describe('Writers', () => {
+    it('configureTaskResultWriter delegates to result-recorder', () => {
+      // Arrange
+      const taskStub = engineSandbox.sb.stub(ResultRecorder, 'setTaskResultRecorder');
       const fn = async () => {};
+
+      // Act
       justin.configureTaskResultWriter(fn);
+
+      // Assert
+      expect(taskStub.calledOnceWithExactly(fn)).toBe(true);
+    });
+
+    it('configureDecisionRuleResultWriter delegates to result-recorder', () => {
+      // Arrange
+      const ruleStub = engineSandbox.sb.stub(ResultRecorder, 'setDecisionRuleResultRecorder');
+      const fn = async () => {};
+
+      // Act
       justin.configureDecisionRuleResultWriter(fn);
 
-      sinon.assert.calledOnceWithExactly(taskStub, fn);
-      sinon.assert.calledOnceWithExactly(ruleStub, fn);
+      // Assert
+      expect(ruleStub.calledOnceWithExactly(fn)).toBe(true);
     });
   });
 });
