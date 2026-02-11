@@ -1,12 +1,5 @@
-import {
-  JUser,
-  NewUserRecord,
-  configureLogger as configureCoreLogger,
-  createLogger,
-  type Logger,
-  type LoggerConfig,
-  type BaseSeverity,
-} from '@just-in/core';
+import { configureLogger as configureCoreLogger, createLogger } from '@just-in/core';
+import type { JUser, NewUserRecord, Logger, LoggerConfig, BaseSeverity } from '@just-in/core';
 import { EventHandlerManager } from './event/event-handler-manager';
 import { registerTask as coreRegisterTask } from './handlers/task.manager';
 import { registerDecisionRule as coreRegisterDecisionRule } from './handlers/decision-rule.manager';

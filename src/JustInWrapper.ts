@@ -1,4 +1,5 @@
-import DataManager, {
+import {
+  DataManager,
   DBType,
   UserManager,
   createLogger,
