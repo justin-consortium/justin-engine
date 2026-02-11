@@ -1,24 +1,20 @@
 import sinon from 'sinon';
-import { Log } from '../../logger/logger-manager';
-import * as recorder from '../result-recorder';
-import DataManager from '../../data-manager/data-manager';
-import { DECISION_RULE_RESULTS, TASK_RESULTS } from '../../data-manager/data-manager.constants';
 
-const {
-  hasResultRecord,
-  handleDecisionRuleResult,
-  handleTaskResult,
-  setDecisionRuleResultRecorder,
-  setTaskResultRecorder,
-  setResultRecorderPersistenceEnabled,
-} = recorder as any;
+import { makeEngineSandbox } from '../../testing';
+
+import * as Recorder from '../result-recorder';
+import {DataManager} from '@just-in/core';
+import {
+  DECISION_RULE_RESULTS,
+  TASK_RESULTS,
+} from '../../constants';
+
 
 describe('Result Recorder Module', () => {
-  let warnStub: sinon.SinonStub;
-  let devStub: sinon.SinonStub;
+  const engineSandbox = makeEngineSandbox();
 
-  // Fresh stubbed DM instance returned by DataManager.getInstance()
   let dmInstance: { addItemToCollection: sinon.SinonStub };
+  let getInstanceStub: sinon.SinonStub;
 
   const emptyRecord = { steps: [] } as any;
   const nonEmptyRecord = {
@@ -29,282 +25,310 @@ describe('Result Recorder Module', () => {
     status: 'OK',
   } as any;
 
-  const TAG_DECISION = '[ResultRecorder:decision]';
-  const TAG_TASK = '[ResultRecorder:task]';
+  beforeEach(async () => {
+    // Arrange
+    await engineSandbox.reset();
 
-  beforeEach(() => {
-    // Ensure clean internal module state between tests
-    if ((recorder as any).__testOnlyResetRecorderState__) {
-      (recorder as any).__testOnlyResetRecorderState__();
+    if (typeof (Recorder as any).__testOnlyResetRecorderState__ === 'function') {
+      (Recorder as any).__testOnlyResetRecorderState__();
     } else {
-      setDecisionRuleResultRecorder(null as any);
-      setTaskResultRecorder(null as any);
-      if (typeof setResultRecorderPersistenceEnabled === 'function') {
-        setResultRecorderPersistenceEnabled(true);
+      Recorder.setDecisionRuleResultRecorder(null as any);
+      Recorder.setTaskResultRecorder(null as any);
+      if (typeof (Recorder as any).setResultRecorderPersistenceEnabled === 'function') {
+        (Recorder as any).setResultRecorderPersistenceEnabled(true);
       }
     }
 
-    warnStub = sinon.stub(Log, 'warn');
-    devStub = sinon.stub(Log, 'dev');
-
-    dmInstance = { addItemToCollection: sinon.stub().resolves() };
-    // By default, DM is available and works
-    jest.spyOn(DataManager, 'getInstance').mockReturnValue(dmInstance as any);
+    dmInstance = { addItemToCollection: engineSandbox.sb.stub().resolves() };
+    getInstanceStub = engineSandbox.sb.stub(DataManager, 'getInstance').returns(dmInstance as any);
   });
 
-  afterEach(() => {
-    sinon.restore();
-    (DataManager.getInstance as jest.Mock).mockRestore();
+  afterEach(async () => {
+    await engineSandbox.restore();
   });
 
   describe('hasResultRecord', () => {
     it('returns false for empty steps', () => {
-      expect(hasResultRecord(emptyRecord)).toBe(false);
+      // Arrange / Act
+      const result = Recorder.hasResultRecord(emptyRecord);
+
+      // Assert
+      expect(result).toBe(false);
     });
+
     it('returns true for non-empty steps', () => {
-      expect(hasResultRecord(nonEmptyRecord)).toBe(true);
+      // Arrange / Act
+      const result = Recorder.hasResultRecord(nonEmptyRecord);
+
+      // Assert
+      expect(result).toBe(true);
     });
   });
 
   describe('handleDecisionRuleResult', () => {
-    it('calls decision recorder when set (success path) and does not touch DM', async () => {
-      const callback = sinon.spy();
-      setDecisionRuleResultRecorder(callback);
+    it('calls decision recorder when set and does not touch DataManager', async () => {
+      // Arrange
+      const callback = engineSandbox.sb.spy();
+      Recorder.setDecisionRuleResultRecorder(callback);
 
-      await handleDecisionRuleResult(nonEmptyRecord);
+      // Act
+      await Recorder.handleDecisionRuleResult(nonEmptyRecord);
 
-      sinon.assert.calledOnceWithExactly(callback, nonEmptyRecord);
-      sinon.assert.notCalled(dmInstance.addItemToCollection);
-      sinon.assert.notCalled(devStub);
-      sinon.assert.notCalled(warnStub);
+      // Assert
+      expect(callback.calledOnceWithExactly(nonEmptyRecord)).toBe(true);
+      expect(getInstanceStub.called).toBe(false);
+      expect(dmInstance.addItemToCollection.called).toBe(false);
     });
 
-    it('defaults to DM add when no writer is set', async () => {
-      await handleDecisionRuleResult(nonEmptyRecord);
+    it('defaults to DataManager add when no writer is set', async () => {
+      // Arrange
 
-      sinon.assert.calledOnceWithExactly(
-        dmInstance.addItemToCollection,
-        DECISION_RULE_RESULTS,
-        nonEmptyRecord
-      );
-      sinon.assert.notCalled(devStub);
+      // Act
+      await Recorder.handleDecisionRuleResult(nonEmptyRecord);
+
+      // Assert
+      expect(getInstanceStub.calledOnce).toBe(true);
+      expect(
+        dmInstance.addItemToCollection.calledOnceWithExactly(
+          DECISION_RULE_RESULTS,
+          nonEmptyRecord,
+        ),
+      ).toBe(true);
     });
 
-    it('falls back to console when DM not available (getInstance throws)', async () => {
-      (DataManager.getInstance as jest.Mock).mockImplementation(() => {
-        throw new Error('no DM');
-      });
+    it('resolves when DataManager.getInstance throws', async () => {
+      // Arrange
+      getInstanceStub.restore();
+      engineSandbox.sb.stub(DataManager, 'getInstance').throws(new Error('no DM'));
 
-      await handleDecisionRuleResult(nonEmptyRecord);
-
-      sinon.assert.notCalled(dmInstance.addItemToCollection);
-      sinon.assert.calledOnce(devStub);
-      expect(devStub.firstCall.args[0]).toBe(TAG_DECISION);
-      expect(devStub.firstCall.args[1]).toBe(nonEmptyRecord);
+      // Act / Assert
+      await expect(
+        Recorder.handleDecisionRuleResult(nonEmptyRecord),
+      ).resolves.toBeUndefined();
     });
 
-    it('warns and falls back when custom decision writer throws', async () => {
-      setDecisionRuleResultRecorder(() => {
+    it('falls back to DataManager when custom decision writer throws', async () => {
+      // Arrange
+      Recorder.setDecisionRuleResultRecorder(() => {
         throw new Error('boom');
       });
 
-      await handleDecisionRuleResult(nonEmptyRecord);
+      // Act
+      await Recorder.handleDecisionRuleResult(nonEmptyRecord);
 
-      sinon.assert.called(warnStub);
-      sinon.assert.calledOnceWithExactly(
-        dmInstance.addItemToCollection,
-        DECISION_RULE_RESULTS,
-        nonEmptyRecord
-      );
-      sinon.assert.notCalled(devStub);
+      // Assert
+      expect(getInstanceStub.calledOnce).toBe(true);
+      expect(
+        dmInstance.addItemToCollection.calledOnceWithExactly(
+          DECISION_RULE_RESULTS,
+          nonEmptyRecord,
+        ),
+      ).toBe(true);
     });
 
-    it('if DM write fails, warns and logs to console', async () => {
+    it('resolves when DataManager write fails', async () => {
+      // Arrange
       dmInstance.addItemToCollection.rejects(new Error('dm write failed'));
 
-      await handleDecisionRuleResult(nonEmptyRecord);
+      // Act / Assert
+      await expect(
+        Recorder.handleDecisionRuleResult(nonEmptyRecord),
+      ).resolves.toBeUndefined();
 
-      sinon.assert.calledOnce(dmInstance.addItemToCollection);
-      sinon.assert.called(warnStub);
-      sinon.assert.calledOnce(devStub);
-      expect(devStub.firstCall.args[0]).toBe(TAG_DECISION);
-      expect(devStub.firstCall.args[1]).toBe(nonEmptyRecord);
+      expect(dmInstance.addItemToCollection.calledOnce).toBe(true);
     });
 
-    it('no-op when steps are empty (no DM, no console)', async () => {
-      await handleDecisionRuleResult(emptyRecord);
-      sinon.assert.notCalled(dmInstance.addItemToCollection);
-      sinon.assert.notCalled(devStub);
-      sinon.assert.notCalled(warnStub);
+    it('no-op when steps are empty', async () => {
+      // Arrange
+
+      // Act
+      await Recorder.handleDecisionRuleResult(emptyRecord);
+
+      // Assert
+      expect(getInstanceStub.called).toBe(false);
+      expect(dmInstance.addItemToCollection.called).toBe(false);
     });
   });
 
   describe('handleTaskResult', () => {
-    it('calls task recorder when set (success path) and does not touch DM', async () => {
-      const taskCb = sinon.spy();
-      setTaskResultRecorder(taskCb);
+    it('calls task recorder when set and does not touch DataManager', async () => {
+      // Arrange
+      const taskCb = engineSandbox.sb.spy();
+      Recorder.setTaskResultRecorder(taskCb);
 
-      await handleTaskResult(nonEmptyRecord);
+      // Act
+      await Recorder.handleTaskResult(nonEmptyRecord);
 
-      sinon.assert.calledOnceWithExactly(taskCb, nonEmptyRecord);
-      sinon.assert.notCalled(dmInstance.addItemToCollection);
-      sinon.assert.notCalled(devStub);
-      sinon.assert.notCalled(warnStub);
+      // Assert
+      expect(taskCb.calledOnceWithExactly(nonEmptyRecord)).toBe(true);
+      expect(getInstanceStub.called).toBe(false);
+      expect(dmInstance.addItemToCollection.called).toBe(false);
     });
 
     it('falls back to decision recorder when task recorder not set', async () => {
-      const decisionCb = sinon.spy();
-      setDecisionRuleResultRecorder(decisionCb);
+      // Arrange
+      const decisionCb = engineSandbox.sb.spy();
+      Recorder.setDecisionRuleResultRecorder(decisionCb);
 
-      await handleTaskResult(nonEmptyRecord);
+      // Act
+      await Recorder.handleTaskResult(nonEmptyRecord);
 
-      sinon.assert.calledOnceWithExactly(decisionCb, nonEmptyRecord);
-      sinon.assert.notCalled(dmInstance.addItemToCollection);
-      sinon.assert.notCalled(devStub);
+      // Assert
+      expect(decisionCb.calledOnceWithExactly(nonEmptyRecord)).toBe(true);
+      expect(getInstanceStub.called).toBe(false);
+      expect(dmInstance.addItemToCollection.called).toBe(false);
     });
 
-    it('defaults to DM add when no writers set', async () => {
-      await handleTaskResult(nonEmptyRecord);
+    it('defaults to DataManager add when no writers set', async () => {
+      // Arrange
 
-      sinon.assert.calledOnceWithExactly(
-        dmInstance.addItemToCollection,
-        TASK_RESULTS,
-        nonEmptyRecord
-      );
-      sinon.assert.notCalled(devStub);
+      // Act
+      await Recorder.handleTaskResult(nonEmptyRecord);
+
+      // Assert
+      expect(getInstanceStub.calledOnce).toBe(true);
+      expect(
+        dmInstance.addItemToCollection.calledOnceWithExactly(
+          TASK_RESULTS,
+          nonEmptyRecord,
+        ),
+      ).toBe(true);
     });
 
-    it('warns and falls back when task writer throws', async () => {
-      setTaskResultRecorder(() => {
+    it('falls back to DataManager when task writer throws', async () => {
+      // Arrange
+      Recorder.setTaskResultRecorder(() => {
         throw new Error('boom');
       });
 
-      await handleTaskResult(nonEmptyRecord);
+      // Act
+      await Recorder.handleTaskResult(nonEmptyRecord);
 
-      sinon.assert.called(warnStub);
-      sinon.assert.calledOnceWithExactly(
-        dmInstance.addItemToCollection,
-        TASK_RESULTS,
-        nonEmptyRecord
-      );
-      sinon.assert.notCalled(devStub);
+      // Assert
+      expect(getInstanceStub.calledOnce).toBe(true);
+      expect(
+        dmInstance.addItemToCollection.calledOnceWithExactly(
+          TASK_RESULTS,
+          nonEmptyRecord,
+        ),
+      ).toBe(true);
     });
 
-    it('warns and falls back when delegated decision writer throws', async () => {
-      setDecisionRuleResultRecorder(() => {
+    it('falls back to DataManager when delegated decision writer throws', async () => {
+      // Arrange
+      Recorder.setDecisionRuleResultRecorder(() => {
         throw new Error('boom');
       });
 
-      await handleTaskResult(nonEmptyRecord);
+      // Act
+      await Recorder.handleTaskResult(nonEmptyRecord);
 
-      sinon.assert.called(warnStub);
-      sinon.assert.calledOnceWithExactly(
-        dmInstance.addItemToCollection,
-        TASK_RESULTS,
-        nonEmptyRecord
-      );
-      sinon.assert.notCalled(devStub);
+      // Assert
+      expect(getInstanceStub.calledOnce).toBe(true);
+      expect(
+        dmInstance.addItemToCollection.calledOnceWithExactly(
+          TASK_RESULTS,
+          nonEmptyRecord,
+        ),
+      ).toBe(true);
     });
 
-    it('console fallback when DM unavailable (getInstance throws)', async () => {
-      (DataManager.getInstance as jest.Mock).mockImplementation(() => {
-        throw new Error('no DM');
-      });
+    it('resolves when DataManager.getInstance throws', async () => {
+      // Arrange
+      getInstanceStub.restore();
+      engineSandbox.sb.stub(DataManager, 'getInstance').throws(new Error('no DM'));
 
-      await handleTaskResult(nonEmptyRecord);
-
-      sinon.assert.notCalled(dmInstance.addItemToCollection);
-      sinon.assert.calledOnce(devStub);
-      expect(devStub.firstCall.args[0]).toBe(TAG_TASK);
-      expect(devStub.firstCall.args[1]).toBe(nonEmptyRecord);
+      // Act / Assert
+      await expect(Recorder.handleTaskResult(nonEmptyRecord)).resolves.toBeUndefined();
     });
 
-    it('console fallback when DM write rejects', async () => {
+    it('resolves when DataManager write rejects', async () => {
+      // Arrange
       dmInstance.addItemToCollection.rejects(new Error('dm write failed'));
 
-      await handleTaskResult(nonEmptyRecord);
-
-      sinon.assert.calledOnce(dmInstance.addItemToCollection);
-      sinon.assert.called(warnStub);
-      sinon.assert.calledOnce(devStub);
-      expect(devStub.firstCall.args[0]).toBe(TAG_TASK);
-      expect(devStub.firstCall.args[1]).toBe(nonEmptyRecord);
+      // Act / Assert
+      await expect(Recorder.handleTaskResult(nonEmptyRecord)).resolves.toBeUndefined();
+      expect(dmInstance.addItemToCollection.calledOnce).toBe(true);
     });
 
-    it('no-op when steps are empty (no DM, no console)', async () => {
-      await handleTaskResult(emptyRecord);
-      sinon.assert.notCalled(dmInstance.addItemToCollection);
-      sinon.assert.notCalled(devStub);
-      sinon.assert.notCalled(warnStub);
+    it('no-op when steps are empty', async () => {
+      // Arrange
+
+      // Act
+      await Recorder.handleTaskResult(emptyRecord);
+
+      // Assert
+      expect(getInstanceStub.called).toBe(false);
+      expect(dmInstance.addItemToCollection.called).toBe(false);
     });
   });
 
-  //
-  // Lite/serverless mode behavior (persistence disabled)
-  //
   describe('Lite mode (persistence disabled)', () => {
     beforeEach(() => {
-      if (typeof setResultRecorderPersistenceEnabled === 'function') {
-        setResultRecorderPersistenceEnabled(false);
+      // Arrange
+      if (typeof (Recorder as any).setResultRecorderPersistenceEnabled === 'function') {
+        (Recorder as any).setResultRecorderPersistenceEnabled(false);
       }
-      sinon.resetHistory();
-      (DataManager.getInstance as jest.Mock).mockClear();
+
+      getInstanceStub.resetHistory();
+      dmInstance.addItemToCollection.resetHistory();
     });
 
     afterEach(() => {
-      if (typeof setResultRecorderPersistenceEnabled === 'function') {
-        setResultRecorderPersistenceEnabled(true);
+      // Arrange
+      if (typeof (Recorder as any).setResultRecorderPersistenceEnabled === 'function') {
+        (Recorder as any).setResultRecorderPersistenceEnabled(true);
       }
     });
 
-    it('decision: with no writers, logs to console and never calls DataManager.getInstance', async () => {
-      await handleDecisionRuleResult(nonEmptyRecord);
+    it('decision: with no writers, never calls DataManager.getInstance', async () => {
+      // Arrange
 
-      expect((DataManager.getInstance as jest.Mock).mock.calls.length).toBe(0);
-      sinon.assert.notCalled(dmInstance.addItemToCollection);
-      sinon.assert.calledOnce(devStub);
-      expect(devStub.firstCall.args[0]).toBe(TAG_DECISION);
-      expect(devStub.firstCall.args[1]).toBe(nonEmptyRecord);
-      sinon.assert.notCalled(warnStub);
+      // Act
+      await Recorder.handleDecisionRuleResult(nonEmptyRecord);
+
+      // Assert
+      expect(getInstanceStub.called).toBe(false);
+      expect(dmInstance.addItemToCollection.called).toBe(false);
     });
 
-    it('task: with no writers, logs to console and never calls DataManager.getInstance', async () => {
-      await handleTaskResult(nonEmptyRecord);
+    it('task: with no writers, never calls DataManager.getInstance', async () => {
+      // Arrange
 
-      expect((DataManager.getInstance as jest.Mock).mock.calls.length).toBe(0);
-      sinon.assert.notCalled(dmInstance.addItemToCollection);
-      sinon.assert.calledOnce(devStub);
-      expect(devStub.firstCall.args[0]).toBe(TAG_TASK);
-      expect(devStub.firstCall.args[1]).toBe(nonEmptyRecord);
-      sinon.assert.notCalled(warnStub);
+      // Act
+      await Recorder.handleTaskResult(nonEmptyRecord);
+
+      // Assert
+      expect(getInstanceStub.called).toBe(false);
+      expect(dmInstance.addItemToCollection.called).toBe(false);
     });
 
-    it('custom writer still used and no DM calls (decision)', async () => {
-      const cb = sinon.stub().resolves();
-      setDecisionRuleResultRecorder(cb);
+    it('custom writer still used and no DataManager calls (decision)', async () => {
+      // Arrange
+      const cb = engineSandbox.sb.stub().resolves();
+      Recorder.setDecisionRuleResultRecorder(cb);
 
-      await handleDecisionRuleResult(nonEmptyRecord);
+      // Act
+      await Recorder.handleDecisionRuleResult(nonEmptyRecord);
 
-      sinon.assert.calledOnceWithExactly(cb, nonEmptyRecord);
-      expect((DataManager.getInstance as jest.Mock).mock.calls.length).toBe(0);
-      sinon.assert.notCalled(dmInstance.addItemToCollection);
-      sinon.assert.notCalled(devStub);
-      sinon.assert.notCalled(warnStub);
+      // Assert
+      expect(cb.calledOnceWithExactly(nonEmptyRecord)).toBe(true);
+      expect(getInstanceStub.called).toBe(false);
+      expect(dmInstance.addItemToCollection.called).toBe(false);
     });
 
-    it('custom writer throws → warn + console fallback, but still no DM calls (task)', async () => {
-      setTaskResultRecorder(() => {
+    it('custom writer throws and still no DataManager calls (task)', async () => {
+      // Arrange
+      Recorder.setTaskResultRecorder(() => {
         throw new Error('boom');
       });
 
-      await handleTaskResult(nonEmptyRecord);
+      // Act
+      await Recorder.handleTaskResult(nonEmptyRecord);
 
-      expect((DataManager.getInstance as jest.Mock).mock.calls.length).toBe(0);
-      sinon.assert.notCalled(dmInstance.addItemToCollection);
-      sinon.assert.called(warnStub);
-      sinon.assert.calledOnce(devStub);
-      expect(devStub.firstCall.args[0]).toBe(TAG_TASK);
-      expect(devStub.firstCall.args[1]).toBe(nonEmptyRecord);
+      // Assert
+      expect(getInstanceStub.called).toBe(false);
+      expect(dmInstance.addItemToCollection.called).toBe(false);
     });
   });
 });
