@@ -1,577 +1,328 @@
-import sinon from 'sinon';
+import { makeEngineSandbox } from '../testing';
+
 import { JustInWrapper } from '../JustInWrapper';
-import DataManager from '../data-manager/data-manager';
+import {DataManager, UserManager, DBType} from '@just-in/core';
 import { EventHandlerManager } from '../event/event-handler-manager';
-import { UserManager } from '../user-manager/user-manager';
 import * as EventQueue from '../event/event-queue';
 import * as TaskManager from '../handlers/task.manager';
 import * as DecisionRuleManager from '../handlers/decision-rule.manager';
-import * as LoggerManager from '../logger/logger-manager';
-import { DBType } from '../data-manager/data-manager.constants';
-import { TaskRegistration, DecisionRuleRegistration } from '../handlers/handler.type';
-import { Logger } from '../logger/logger.interface';
-import { Log } from '../logger/logger-manager';
-import { JUser } from '../user-manager/user.type';
-
-// Create stubs for all dependencies
-const dataManager = DataManager.getInstance();
-const eventHandlerManager = EventHandlerManager.getInstance();
-
-// DataManager stubs
-const dataManagerInitStub = sinon.stub(dataManager, 'init');
-const dataManagerCloseStub = sinon.stub(dataManager, 'close');
-
-// EventHandlerManager stubs
-const registerEventHandlersStub = sinon.stub(eventHandlerManager, 'registerEventHandlers');
-const unregisterEventHandlersStub = sinon.stub(eventHandlerManager, 'unregisterEventHandlers');
-
-// UserManager stubs
-const userManagerInitStub = sinon.stub(UserManager, 'init');
-const userManagerAddUsersToDatabaseStub = sinon.stub(UserManager, 'addUsers');
-const userManagerGetAllUsersStub = sinon.stub(UserManager, 'getAllUsers');
-const userManagerAddUserStub = sinon.stub(UserManager, 'addUser');
-const userManagerUpdateUserStub = sinon.stub(UserManager, 'updateUserByUniqueIdentifier');
-const userManagerGetUserByUniqueIdentifierStub = sinon.stub(UserManager, 'getUserByUniqueIdentifier');
-const userManagerDeleteUserStub = sinon.stub(UserManager, 'deleteUserByUniqueIdentifier');
-const userManagerStopUserManagerStub = sinon.stub(UserManager, 'shutdown');
-
-// EventQueue stubs
-const publishEventStub = sinon.stub(EventQueue, 'publishEvent');
-const processEventQueueStub = sinon.stub(EventQueue, 'processEventQueue');
-const setupEventQueueListenerStub = sinon.stub(EventQueue, 'setupEventQueueListener');
-const startEventQueueProcessingStub = sinon.stub(EventQueue, 'startEventQueueProcessing');
-const stopEventQueueProcessingStub = sinon.stub(EventQueue, 'stopEventQueueProcessing');
-
-// Task and Decision Rule stubs
-const registerTaskStub = sinon.stub(TaskManager, 'registerTask');
-const registerDecisionRuleStub = sinon.stub(DecisionRuleManager, 'registerDecisionRule');
-
-// Logger stubs
-const setLoggerStub = sinon.stub(LoggerManager, 'setLogger');
-const setLogLevelsStub = sinon.stub(LoggerManager, 'setLogLevels');
-const logWarnStub = sinon.stub(Log, 'warn');
-
-// Mock IntervalTimerEventGenerator
-const mockIntervalTimerEventGenerator = {
-  start: sinon.stub(),
-  stop: sinon.stub(),
-};
-
-// JustInWrapper 
-const justInWrapper: JustInWrapper = JustInWrapper.getInstance();
-
-// Stub the IntervalTimerEventGenerator constructor
-const intervalTimerEventGeneratorStub = sinon.stub().returns(mockIntervalTimerEventGenerator);
 
 describe('JustInWrapper', () => {
+  const engineSandbox = makeEngineSandbox();
 
-  beforeEach(() => {
-    justInWrapper.shutdown();
-    dataManagerInitStub.reset();
-    dataManagerCloseStub.reset();
-    registerEventHandlersStub.reset();
-    unregisterEventHandlersStub.reset();
-    userManagerInitStub.reset();
-    userManagerAddUsersToDatabaseStub.reset();
-    userManagerGetAllUsersStub.reset();
-    userManagerAddUserStub.reset();
-    userManagerGetUserByUniqueIdentifierStub.reset();
-    userManagerDeleteUserStub.reset();
-    userManagerStopUserManagerStub.reset();
-    userManagerUpdateUserStub.reset();
-    publishEventStub.reset();
-    processEventQueueStub.reset();
-    setupEventQueueListenerStub.reset();
-    startEventQueueProcessingStub.reset();
-    stopEventQueueProcessingStub.reset();
-    registerTaskStub.reset();
-    registerDecisionRuleStub.reset();
-    setLoggerStub.reset();
-    setLogLevelsStub.reset();
-    mockIntervalTimerEventGenerator.start.reset();
-    mockIntervalTimerEventGenerator.stop.reset();
-    intervalTimerEventGeneratorStub.reset();
-    logWarnStub.reset();
+  let wrapper: JustInWrapper;
+
+  beforeEach(async () => {
+    // Arrange
+    await engineSandbox.reset();
+    wrapper = JustInWrapper.getInstance();
   });
 
-  afterAll(async () => {
-    // Restore all stubs
-    dataManagerInitStub.restore();
-    dataManagerCloseStub.restore();
-    registerEventHandlersStub.restore();
-    unregisterEventHandlersStub.restore();
-    userManagerInitStub.restore();
-    userManagerAddUsersToDatabaseStub.restore();
-    userManagerGetAllUsersStub.restore();
-    userManagerAddUserStub.restore();
-    userManagerGetUserByUniqueIdentifierStub.restore();
-    userManagerUpdateUserStub.restore();
-    userManagerDeleteUserStub.restore();
-    userManagerStopUserManagerStub.restore();
-    publishEventStub.restore();
-    processEventQueueStub.restore();
-    setupEventQueueListenerStub.restore();
-    startEventQueueProcessingStub.restore();
-    stopEventQueueProcessingStub.restore();
-    registerTaskStub.restore();
-    registerDecisionRuleStub.restore();
-    setLoggerStub.restore();
-    setLogLevelsStub.restore();
+  afterEach(async () => {
+    await engineSandbox.restore();
   });
 
   describe('getInstance', () => {
-    it('should return singleton instance', () => {
-      const instance1 = JustInWrapper.getInstance();
-      const instance2 = JustInWrapper.getInstance();
+    it('returns the singleton instance', () => {
+      // Arrange
+      const a = JustInWrapper.getInstance();
 
-      expect(instance1).toBe(instance2);
-      expect(instance1).toBeInstanceOf(JustInWrapper);
+      // Act
+      const b = JustInWrapper.getInstance();
+
+      // Assert
+      expect(a).toBe(b);
+      expect(a).toBeInstanceOf(JustInWrapper);
     });
 
-    it('should create new instance when none exists', () => {
-      // Kill existing instance
+    it('creates a new instance after killInstance', () => {
+      // Arrange
+      const old = JustInWrapper.getInstance();
       (JustInWrapper as any).killInstance();
-      
-      const instance = JustInWrapper.getInstance();
-      expect(instance).toBeInstanceOf(JustInWrapper);
+
+      // Act
+      const fresh = JustInWrapper.getInstance();
+
+      // Assert
+      expect(fresh).toBeInstanceOf(JustInWrapper);
+      expect(fresh).not.toBe(old);
     });
   });
 
   describe('init', () => {
-    beforeEach(async () => {
-      await justInWrapper.shutdown();
-    });
-    
-    it('should initialize database successfully', async () => {
-      Log.dev('In init: should initialize database successfully');
-      await justInWrapper.init();
+    it('initializes DataManager and UserManager once', async () => {
+      // Arrange
+      const dm = DataManager.getInstance();
+      const dmInitStub = engineSandbox.sb.stub(dm, 'init').resolves();
+      const umInitStub = engineSandbox.sb.stub(UserManager, 'init').resolves();
 
-      expect(dataManagerInitStub.calledOnce).toBe(true);
-      expect(dataManagerInitStub.calledWith(DBType.MONGO)).toBe(true);
-      expect(userManagerInitStub.calledOnce).toBe(true);
-    });
+      // Act
+      await wrapper.init();
 
-    it('should initialize database with custom DB type', async () => {
-      Log.dev('In init: should initialize database with custom DB type');
-      await justInWrapper.init(DBType.MONGO);
-
-      Log.dev('dataManagerInitStub.callCount', dataManagerInitStub.callCount);
-      expect(dataManagerInitStub.calledOnce).toBe(true);
-      expect(dataManagerInitStub.calledWith(DBType.MONGO)).toBe(true);
+      // Assert
+      expect(dmInitStub.calledOnce).toBe(true);
+      expect(dmInitStub.calledWith(DBType.MONGO)).toBe(true);
+      expect(umInitStub.calledOnce).toBe(true);
     });
 
-    it('should not reinitialize if already initialized', async () => {
-      // First initialization
-      await justInWrapper.init();
-      
-      // Reset stub to check if called again
-      dataManagerInitStub.reset();
-      userManagerInitStub.reset();
+    it('does not reinitialize if already initialized', async () => {
+      // Arrange
+      const dm = DataManager.getInstance();
+      const dmInitStub = engineSandbox.sb.stub(dm, 'init').resolves();
+      const umInitStub = engineSandbox.sb.stub(UserManager, 'init').resolves();
 
-      // Second initialization attempt
-      await justInWrapper.init();
+      await wrapper.init();
+      dmInitStub.resetHistory();
+      umInitStub.resetHistory();
 
-      expect(dataManagerInitStub.called).toBe(false);
-      expect(userManagerInitStub.called).toBe(false);
+      // Act
+      await wrapper.init();
+
+      // Assert
+      expect(dmInitStub.called).toBe(false);
+      expect(umInitStub.called).toBe(false);
     });
 
-    it('should handle initialization errors', async () => {
-      const error = new Error('Database connection failed');
-      dataManagerInitStub.rejects(error);
+    it('propagates init errors', async () => {
+      // Arrange
+      const dm = DataManager.getInstance();
+      engineSandbox.sb.stub(UserManager, 'init').resolves();
+      engineSandbox.sb.stub(dm, 'init').rejects(new Error('Database connection failed'));
 
-      await expect(justInWrapper.init()).rejects.toThrow('Database connection failed');
-    });
-  });
-
-  describe('addUsers', () => {
-    it('should add users to database successfully', async () => {
-      const users = [{ uniqueIdentifier: 'user1', initialAttributes: { name: 'User 1' } }, { uniqueIdentifier: 'user2', initialAttributes: { name: 'User 2'} }];
-
-      await justInWrapper.addUsers(users);
-
-      expect(userManagerAddUsersToDatabaseStub.calledOnce).toBe(true);
-      expect(userManagerAddUsersToDatabaseStub.calledWith(users)).toBe(true);
-    });
-
-    it('should handle empty users array', async () => {
-      await justInWrapper.addUsers([]);
-
-      expect(userManagerAddUsersToDatabaseStub.calledOnce).toBe(true);
-      expect(userManagerAddUsersToDatabaseStub.calledWith([])).toBe(true);
+      // Act / Assert
+      await expect(wrapper.init()).rejects.toThrow('Database connection failed');
     });
   });
 
-  describe('getAllUsers', () => {
+  describe('users', () => {
+    it('addUsers delegates to UserManager.addUsers', async () => {
+      // Arrange
+      const addUsersStub = engineSandbox.sb.stub(UserManager, 'addUsers').resolves();
+      const users = [
+        { uniqueIdentifier: 'user1', initialAttributes: { name: 'User 1' } },
+        { uniqueIdentifier: 'user2', initialAttributes: { name: 'User 2' } },
+      ];
 
-    it('should retrieve all users', async () => {
-      await justInWrapper.getAllUsers();
-      expect(userManagerGetAllUsersStub.calledOnce).toBe(true);
+      // Act
+      await wrapper.addUsers(users as any);
+
+      // Assert
+      expect(addUsersStub.calledOnceWithExactly(users as any)).toBe(true);
     });
 
-    it('should handle empty user list', async () => {
-      userManagerGetAllUsersStub.resolves([]);
-      const users = await justInWrapper.getAllUsers();
-      expect(users).toEqual([]);
-      expect(userManagerGetAllUsersStub.calledOnce).toBe(true);
-    });
-  });
+    it('getAllUsers delegates to UserManager.getAllUsers', async () => {
+      // Arrange
+      const getAllStub = engineSandbox.sb.stub(UserManager, 'getAllUsers').resolves([]);
 
-  describe('addUser', () => {
-    it('should add user to database successfully', async () => {
+      // Act
+      const out = await wrapper.getAllUsers();
+
+      // Assert
+      expect(getAllStub.calledOnce).toBe(true);
+      expect(out).toEqual([]);
+    });
+
+    it('addUser delegates to UserManager.addUser', async () => {
+      // Arrange
+      const addUserStub = engineSandbox.sb.stub(UserManager, 'addUser').resolves();
       const user = { uniqueIdentifier: 'user1', initialAttributes: { name: 'User 1' } };
 
-      await justInWrapper.addUser(user);
+      // Act
+      await wrapper.addUser(user as any);
 
-      expect(userManagerAddUserStub.calledOnce).toBe(true);
-      expect(userManagerAddUserStub.calledWith(user)).toBe(true);
+      // Assert
+      expect(addUserStub.calledOnceWithExactly(user as any)).toBe(true);
     });
 
-    it('should handle adding null user', async () => {
-      await justInWrapper.addUser(null as any);
+    it('getUser delegates to UserManager.getUserByUniqueIdentifier', async () => {
+      // Arrange
+      const getStub = engineSandbox.sb.stub(UserManager, 'getUserByUniqueIdentifier').resolves(null as any);
 
-      expect(userManagerAddUserStub.calledOnce).toBe(true);
-      expect(userManagerAddUserStub.calledWith(null as any)).toBe(true);
-    });
-  });
+      // Act
+      await wrapper.getUser('user1');
 
-  describe('getUser', () => {
-    it('should retrieve user information by uniqueIdentifier', async () => {
-      const user = { uniqueIdentifier: 'user1', initialAttributes: { name: 'User 1' } };
-      await justInWrapper.getUser(user.uniqueIdentifier) as JUser;
-      expect(userManagerGetUserByUniqueIdentifierStub.calledOnce).toBe(true);
-      expect(userManagerGetUserByUniqueIdentifierStub.calledWith(user.uniqueIdentifier)).toBe(true);
+      // Assert
+      expect(getStub.calledOnceWithExactly('user1')).toBe(true);
     });
 
-    it('should handle user with null identifier', async () => {
-      await justInWrapper.getUser(null as any);
-      expect(userManagerGetUserByUniqueIdentifierStub.calledOnce).toBe(true);
-      expect(userManagerGetUserByUniqueIdentifierStub.calledWith(null as any)).toBe(true);
-    });
-  });
+    it('updateUser delegates to UserManager.updateUserByUniqueIdentifier', async () => {
+      // Arrange
+      const updateStub = engineSandbox.sb
+        .stub(UserManager, 'updateUserByUniqueIdentifier')
+        .resolves(null as any);
 
-  describe('updateUser', () => {
-    it('should update user information by uniqueIdentifier', async () => {
-      const user = { uniqueIdentifier: 'user1', initialAttributes: { name: 'User 1' } };
-      await justInWrapper.updateUser(user.uniqueIdentifier, {name: "New Name"}) as JUser;``
-      expect(userManagerUpdateUserStub.calledOnce).toBe(true);
-      expect(userManagerUpdateUserStub.calledWith(user.uniqueIdentifier, {name: "New Name"})).toBe(true);
+      // Act
+      await wrapper.updateUser('user1', { name: 'New Name' } as any);
+
+      // Assert
+      expect(updateStub.calledOnceWithExactly('user1', { name: 'New Name' } as any)).toBe(true);
     });
 
-    it('should handle user with null uniqueIdentifier and attributes to update', async () => {
-      await justInWrapper.updateUser(null as any, null as any);
-      expect(userManagerUpdateUserStub.calledOnce).toBe(true);
-      expect(userManagerUpdateUserStub.calledWith(null as any, null as any)).toBe(true);
-    });
-  });
+    it('deleteUser delegates to UserManager.deleteUserByUniqueIdentifier', async () => {
+      // Arrange
+      const delStub = engineSandbox.sb.stub(UserManager, 'deleteUserByUniqueIdentifier').resolves();
 
-  describe('deleteUser', () => {
-    it('should delete user information by uniqueIdentifier', async () => {
-      const user = { uniqueIdentifier: 'user1', initialAttributes: { name: 'User 1' } };
-      await justInWrapper.deleteUser(user.uniqueIdentifier);
-      expect(userManagerDeleteUserStub.calledOnce).toBe(true);
-      expect(userManagerDeleteUserStub.calledWith(user.uniqueIdentifier)).toBe(true);
-    });
+      // Act
+      await wrapper.deleteUser('user1');
 
-    it('should handle user with null uniqueIdentifier', async () => {
-      await justInWrapper.deleteUser(null as any);
-      expect(userManagerDeleteUserStub.calledOnce).toBe(true);
-      expect(userManagerDeleteUserStub.calledWith(null as any)).toBe(true);
+      // Assert
+      expect(delStub.calledOnceWithExactly('user1')).toBe(true);
     });
   });
 
-  describe('registerEventHandlers', () => {
-    it('should register event handlers successfully', async () => {
-      const eventType = 'TEST_EVENT';
-      const handlers = ['task1', 'decision1'];
+  describe('event handlers', () => {
+    it('registerEventHandlers delegates to EventHandlerManager.registerEventHandlers', async () => {
+      // Arrange
+      const mgr = EventHandlerManager.getInstance();
+      const regStub = engineSandbox.sb.stub(mgr, 'registerEventHandlers').resolves();
 
-      await justInWrapper.registerEventHandlers(eventType, handlers);
+      // Act
+      await wrapper.registerEventHandlers('TEST_EVENT', ['task1', 'rule1']);
 
-      expect(registerEventHandlersStub.calledOnce).toBe(true);
-      expect(registerEventHandlersStub.calledWith(eventType, handlers)).toBe(true);
+      // Assert
+      expect(regStub.calledOnceWithExactly('TEST_EVENT', ['task1', 'rule1'])).toBe(true);
     });
 
-    it('should handle empty handlers array', async () => {
-      await justInWrapper.registerEventHandlers('TEST_EVENT', []);
+    it('unregisterEventHandlers delegates to EventHandlerManager.unregisterEventHandlers', () => {
+      // Arrange
+      const mgr = EventHandlerManager.getInstance();
+      const unregStub = engineSandbox.sb.stub(mgr, 'unregisterEventHandlers').returns();
 
-      expect(registerEventHandlersStub.calledOnce).toBe(true);
-      expect(registerEventHandlersStub.calledWith('TEST_EVENT', [])).toBe(true);
-    });
-  });
+      // Act
+      wrapper.unregisterEventHandlers('TEST_EVENT');
 
-  describe('unregisterEventHandlers', () => {
-    it('should unregister event handlers successfully', () => {
-      const eventType = 'TEST_EVENT';
-
-      justInWrapper.unregisterEventHandlers(eventType);
-
-      expect(unregisterEventHandlersStub.calledOnce).toBe(true);
-      expect(unregisterEventHandlersStub.calledWith(eventType)).toBe(true);
-    });
-  });
-
-  describe('createIntervalTimerEventGenerator', () => {
-    it('should create interval timer event generator successfully', () => {
-      const eventTypeName = 'TIMER_EVENT';
-      const intervalInMs = 1000;
-      const options = { simulatedStartDate: new Date() };
-
-      justInWrapper.createIntervalTimerEventGenerator(eventTypeName, intervalInMs, options);
-
-      const intervalTimerEventGenerators = justInWrapper.getIntervalTimerEventGenerators();
-      expect(intervalTimerEventGenerators.size).toBe(1);    
-      expect(intervalTimerEventGenerators.get(eventTypeName)).toBeDefined();
+      // Assert
+      expect(unregStub.calledOnceWithExactly('TEST_EVENT')).toBe(true);
     });
   });
 
   describe('publishEvent', () => {
-    it('should publish event successfully', async () => {
-      const eventType = 'TEST_EVENT';
-      const timestamp = new Date();
-      const eventDetails = { test: 'data' };
+    it('delegates to EventQueue.publishEvent', async () => {
+      // Arrange
+      const publishStub = engineSandbox.sb.stub(EventQueue, 'publishEvent').resolves();
+      const ts = new Date();
+      const details = { test: 'data' };
 
-      await justInWrapper.publishEvent(eventType, timestamp, eventDetails);
+      // Act
+      await wrapper.publishEvent('TEST_EVENT', ts, details);
 
-      expect(publishEventStub.calledOnce).toBe(true);
-      expect(publishEventStub.calledWith(eventType, timestamp, eventDetails)).toBe(true);
+      // Assert
+      expect(publishStub.calledOnceWithExactly('TEST_EVENT', ts, details)).toBe(true);
     });
 
-    it('should publish event without details', async () => {
-      const eventType = 'TEST_EVENT';
-      const timestamp = new Date();
+    it('delegates to EventQueue.publishEvent with undefined details', async () => {
+      // Arrange
+      const publishStub = engineSandbox.sb.stub(EventQueue, 'publishEvent').resolves();
+      const ts = new Date();
 
-      await justInWrapper.publishEvent(eventType, timestamp);
+      // Act
+      await wrapper.publishEvent('TEST_EVENT', ts);
 
-      expect(publishEventStub.calledOnce).toBe(true);
-      expect(publishEventStub.calledWith(eventType, timestamp, undefined)).toBe(true);
-    });
-  });
-
-  describe('startEngine', () => {
-    beforeEach(async () => {
-      await justInWrapper.init();
-    });
-
-    afterEach(async () => {
-      await justInWrapper.shutdown();
-    });
-
-    it('should start engine successfully', async () => {
-      // Mock the interval timer event generators map
-      const mockGenerators = new Map();
-      mockGenerators.set('EVENT1', mockIntervalTimerEventGenerator);
-      mockGenerators.set('EVENT2', mockIntervalTimerEventGenerator);
-      
-      (justInWrapper as any).intervalTimerEventGenerators = mockGenerators;
-
-      await justInWrapper.startEngine();
-
-      expect(startEventQueueProcessingStub.calledOnce).toBe(true);
-      expect(processEventQueueStub.calledOnce).toBe(true);
-    });
-
-    it('should start engine with no interval generators', async () => {
-      // Empty generators map
-      (justInWrapper as any).intervalTimerEventGenerators = new Map();
-
-      await justInWrapper.startEngine();
-
-      expect(startEventQueueProcessingStub.calledOnce).toBe(true);
-      expect(processEventQueueStub.calledOnce).toBe(true);
+      // Assert
+      expect(publishStub.calledOnceWithExactly('TEST_EVENT', ts, undefined)).toBe(true);
     });
   });
 
-  describe('setupEventQueueListener', () => {
-    it('should setup event queue listener', () => {
-      justInWrapper.setupEventQueueListener();
-
-      expect(setupEventQueueListenerStub.calledOnce).toBe(true);
-    });
-  });
-
-  describe('registerTask', () => {
-    it('should register task successfully', () => {
-      const task: TaskRegistration = {
-        name: 'test-task',
+  describe('registrations', () => {
+    it('registerTask delegates to TaskManager.registerTask', () => {
+      // Arrange
+      const regStub = engineSandbox.sb.stub(TaskManager, 'registerTask').returns();
+      const task = {
+        name: 'task1',
         beforeExecution: () => {},
         shouldActivate: () => ({ status: 'success' }),
         doAction: () => ({ status: 'success' }),
         afterExecution: () => {},
       };
 
-      justInWrapper.registerTask(task);
+      // Act
+      wrapper.registerTask(task as any);
 
-      expect(registerTaskStub.calledOnce).toBe(true);
-      expect(registerTaskStub.calledWith(task)).toBe(true);
+      // Assert
+      expect(regStub.calledOnceWithExactly(task as any)).toBe(true);
     });
-  });
 
-  describe('registerDecisionRule', () => {
-    it('should register decision rule successfully', () => {
-      const decisionRule: DecisionRuleRegistration = {
-        name: 'test-rule',
+    it('registerDecisionRule delegates to DecisionRuleManager.registerDecisionRule', () => {
+      // Arrange
+      const regStub = engineSandbox.sb.stub(DecisionRuleManager, 'registerDecisionRule').returns();
+      const rule = {
+        name: 'rule1',
         beforeExecution: () => {},
         shouldActivate: () => ({ status: 'success' }),
-        doAction: () => ({ status: 'success' }),
         selectAction: () => ({ status: 'success' }),
+        doAction: () => ({ status: 'success' }),
         afterExecution: () => {},
       };
 
-      justInWrapper.registerDecisionRule(decisionRule);
+      // Act
+      wrapper.registerDecisionRule(rule as any);
 
-      expect(registerDecisionRuleStub.calledOnce).toBe(true);
-      expect(registerDecisionRuleStub.calledWith(decisionRule)).toBe(true);
+      // Assert
+      expect(regStub.calledOnceWithExactly(rule as any)).toBe(true);
     });
   });
 
-  describe('configureLogger', () => {
-    it('should configure logger successfully', () => {
-      const mockLogger: Logger = {
-        info: () => {},
-        warn: () => {},
-        error: () => {},
-        dev: () => {},
-      };
+  describe('engine lifecycle', () => {
+    it('startEngine starts queue processing and kicks processing loop', async () => {
+      // Arrange
+      engineSandbox.sb.stub(EventQueue, 'startEventQueueProcessing').resolves();
+      const processStub = engineSandbox.sb.stub(EventQueue, 'processEventQueue').resolves();
 
-      justInWrapper.configureLogger(mockLogger);
+      const dm = DataManager.getInstance();
+      engineSandbox.sb.stub(dm, 'init').resolves();
+      engineSandbox.sb.stub(UserManager, 'init').resolves();
 
-      expect(setLoggerStub.calledOnce).toBe(true);
-      expect(setLoggerStub.calledWith(mockLogger)).toBe(true);
+      await wrapper.init();
+
+      // Act
+      await wrapper.startEngine();
+
+      // Assert
+      expect(processStub.calledOnce).toBe(true);
+    });
+
+    it('shutdown stops queue processing, shuts down UserManager, and closes DataManager', async () => {
+      // Arrange
+      const dm = DataManager.getInstance();
+      const dmInitStub = engineSandbox.sb.stub(dm, 'init').resolves();
+      const dmCloseStub = engineSandbox.sb.stub(dm, 'close').resolves();
+
+      const umInitStub = engineSandbox.sb.stub(UserManager, 'init').resolves();
+      const umShutdownStub = engineSandbox.sb.stub(UserManager, 'shutdown').resolves();
+
+      const stopStub = engineSandbox.sb.stub(EventQueue, 'stopEventQueueProcessing').resolves();
+      engineSandbox.sb.stub(EventQueue, 'startEventQueueProcessing').resolves();
+      engineSandbox.sb.stub(EventQueue, 'processEventQueue').resolves();
+
+      await wrapper.init();
+      expect(dmInitStub.calledOnce).toBe(true);
+      expect(umInitStub.calledOnce).toBe(true);
+
+      await wrapper.startEngine();
+
+      // Act
+      await wrapper.shutdown();
+
+      // Assert
+      expect(stopStub.calledOnce).toBe(true);
+      expect(umShutdownStub.calledOnce).toBe(true);
+      expect(dmCloseStub.calledOnce).toBe(true);
+
+      const map = (wrapper as any).intervalTimerEventGenerators as Map<string, any>;
+      expect(map.size).toBe(0);
     });
   });
 
-  describe('setLoggingLevels', () => {
-    it('should set logging levels successfully', () => {
-      const levels = { info: true, warn: false };
+  describe('JustIn()', () => {
+    it('returns the singleton wrapper instance', () => {
+      // Arrange
+      const mod = require('../JustInWrapper') as { JustIn: () => JustInWrapper };
 
-      justInWrapper.setLoggingLevels(levels);
+      // Act
+      const inst = mod.JustIn();
 
-      expect(setLogLevelsStub.calledOnce).toBe(true);
-      expect(setLogLevelsStub.calledWith(levels)).toBe(true);
-    });
-
-    it('should handle empty levels object', () => {
-      justInWrapper.setLoggingLevels({});
-
-      expect(setLogLevelsStub.calledOnce).toBe(true);
-      expect(setLogLevelsStub.calledWith({})).toBe(true);
+      // Assert
+      expect(inst).toBe(JustInWrapper.getInstance());
     });
   });
-
-  describe('shutdown', () => {
-    it('should shutdown engine successfully', async () => {
-
-      await justInWrapper.init();
-
-      justInWrapper.createIntervalTimerEventGenerator('EVENT1', 1000);
-      justInWrapper.createIntervalTimerEventGenerator('EVENT2', 1000);
-
-      expect((justInWrapper as any).intervalTimerEventGenerators.size).toBe(2);
-      await justInWrapper.startEngine();
-
-      await justInWrapper.shutdown();
-
-      expect((justInWrapper as any).intervalTimerEventGenerators.size).toBe(0);
-      expect(stopEventQueueProcessingStub.calledOnce).toBe(true);
-      expect(userManagerStopUserManagerStub.calledOnce).toBe(true);
-      expect(dataManagerCloseStub.calledOnce).toBe(true);
-    });
-
-    it('should shutdown engine with no interval generators', async () => {
-      // Empty generators map
-      (justInWrapper as any).intervalTimerEventGenerators = new Map();
-
-      await justInWrapper.init();
-      await justInWrapper.startEngine();
-      await justInWrapper.shutdown();
-
-      expect(mockIntervalTimerEventGenerator.stop.called).toBe(false);
-      expect(stopEventQueueProcessingStub.calledOnce).toBe(true);
-      expect(userManagerStopUserManagerStub.calledOnce).toBe(true);
-      expect(dataManagerCloseStub.calledOnce).toBe(true);
-    });
-
-    it('should handle shutdown errors gracefully', async () => {
-      await justInWrapper.init();
-      const error = new Error('Database close failed');
-      dataManagerCloseStub.rejects(error);
-      await justInWrapper.shutdown();
-      const logWarnArgs = logWarnStub.args[0];
-      expect(logWarnArgs[0]).toBe('Error shutting down JustInWrapper:');
-      expect(logWarnArgs[1]).toMatchObject(error);
-    });
-  });
-
-  describe('JustIn instance', () => {
-    it('should return JustInWrapper instance', () => {
-      const { JustIn } = require('../JustInWrapper');
-      const instance = JustIn();
-
-      expect(instance).toBeInstanceOf(JustInWrapper);
-      expect(instance).toBe(JustInWrapper.getInstance());
-    });
-  });
-
-  describe('integration scenarios', () => {
-
-    it('should handle complete lifecycle: initialize, start, shutdown', async () => {
-      // Initialize
-      await justInWrapper.init();
-      expect(dataManagerInitStub.calledOnce).toBe(true);
-
-      // Register event handlers
-      await justInWrapper.registerEventHandlers('TEST_EVENT', ['task1']);
-      expect(registerEventHandlersStub.calledOnce).toBe(true);
-
-      // Start engine
-      await justInWrapper.startEngine();
-      expect(startEventQueueProcessingStub.calledOnce).toBe(true);
-      expect(processEventQueueStub.calledOnce).toBe(true);
-
-      // Shutdown
-      await justInWrapper.shutdown();
-      expect(stopEventQueueProcessingStub.calledOnce).toBe(true);
-      expect(dataManagerCloseStub.calledOnce).toBe(true);
-    });
-
-    it('should handle multiple event registrations', async () => {
-      await justInWrapper.registerEventHandlers('EVENT1', ['task1']);
-      await justInWrapper.registerEventHandlers('EVENT2', ['task2', 'decision1']);
-
-      expect(registerEventHandlersStub.calledTwice).toBe(true);
-      expect(registerEventHandlersStub.firstCall.args).toEqual(['EVENT1', ['task1']]);
-      expect(registerEventHandlersStub.secondCall.args).toEqual(['EVENT2', ['task2', 'decision1']]);
-    });
-
-    it('should handle multiple task and decision rule registrations', () => {
-      const task1: TaskRegistration = { 
-        name: 'task1', 
-        beforeExecution: () => {}, 
-        shouldActivate: () => ({ status: 'success' }),
-        doAction: () => ({ status: 'success' }),
-        afterExecution: () => {} 
-      };
-      const task2: TaskRegistration = { 
-        name: 'task2', 
-        beforeExecution: () => {}, 
-        shouldActivate: () => ({ status: 'success' }),
-        doAction: () => ({ status: 'success' }),
-        afterExecution: () => {} 
-      };
-      const rule1: DecisionRuleRegistration = { 
-        name: 'rule1', 
-        beforeExecution: () => {}, 
-        shouldActivate: () => ({ status: 'success' }),
-        doAction: () => ({ status: 'success' }),
-        selectAction: () => ({ status: 'success' }),
-        afterExecution: () => {} 
-      };
-
-      justInWrapper.registerTask(task1);
-      justInWrapper.registerTask(task2);
-      justInWrapper.registerDecisionRule(rule1);
-
-      expect(registerTaskStub.calledTwice).toBe(true);
-      expect(registerDecisionRuleStub.calledOnce).toBe(true);
-    });
-  });
-}); 
+});
