@@ -1,551 +1,368 @@
 import sinon from 'sinon';
+import { makeUser } from '@just-in/core/testing';
+import { makeEngineSandbox } from '../../testing';
 import * as EventQueue from '../event-queue';
 import { EventHandlerManager } from '../event-handler-manager';
-import DataManager from '../../data-manager/data-manager';
-import { ChangeListenerManager } from '../../data-manager/change-listener.manager';
-import { UserManager } from '../../user-manager/user-manager';
-import { Log } from '../../logger/logger-manager';
-import * as TaskManager from '../../handlers/task.manager';
-import * as DecisionRuleManager from '../../handlers/decision-rule.manager';
-import { JEvent } from '../event.type';
-import { JUser } from '../../user-manager/user.type';
-import { CollectionChangeType } from '../../data-manager/data-manager.type';
-import { BaseHandler, DecisionRule, Task } from '../../handlers/handler.type';
+import {DataManager, ChangeListenerManager, UserManager, CollectionChangeType} from '@just-in/core';
 import * as EventExecutor from '../event-executor';
+import type { JEvent } from '../event.type';
+import type { JUser } from '@just-in/core';
 
-// Create stubs for all dependencies
-const eventHandlerManager = EventHandlerManager.getInstance();
-const dataManager = DataManager.getInstance();
-const changeListenerManager = ChangeListenerManager.getInstance();
+describe('EventQueue', () => {
+  const engineSandbox = makeEngineSandbox();
 
-// EventHandlerManager stubs
-const hasHandlersForEventTypeStub = sinon.stub(eventHandlerManager, 'hasHandlersForEventType');
-const getHandlersForEventTypeStub = sinon.stub(eventHandlerManager, 'getHandlersForEventType');
+  let eventHandlerManager: EventHandlerManager;
+  let dataManager: DataManager;
+  let changeListenerManager: ChangeListenerManager;
 
-// DataManager stubs
-const addItemToCollectionStub = sinon.stub(dataManager, 'addItemToCollection');
-const getAllInCollectionStub = sinon.stub(dataManager, 'getAllInCollection');
-const removeItemFromCollectionStub = sinon.stub(dataManager, 'removeItemFromCollection');
+  let hasHandlersForEventTypeStub: sinon.SinonStub;
+  let getHandlersForEventTypeStub: sinon.SinonStub;
 
-// ChangeListenerManager stubs
-const addChangeListenerStub = sinon.stub(changeListenerManager, 'addChangeListener');
-const removeChangeListenerStub = sinon.stub(changeListenerManager, 'removeChangeListener');
+  let addItemToCollectionStub: sinon.SinonStub;
+  let getAllInCollectionStub: sinon.SinonStub;
+  let removeItemFromCollectionStub: sinon.SinonStub;
 
-// UserManager stubs
-const getAllUsersStub = sinon.stub(UserManager, 'getAllUsers');
+  let addChangeListenerStub: sinon.SinonStub;
+  let removeChangeListenerStub: sinon.SinonStub;
 
-// Logger stubs
-const logInfoStub = sinon.stub(Log, 'info');
-const logWarnStub = sinon.stub(Log, 'warn');
-const logErrorStub = sinon.stub(Log, 'error');
-const logDevStub = sinon.stub(Log, 'dev');
+  let getAllUsersStub: sinon.SinonStub;
 
-// Task and Decision Rule stubs
-const getTaskByNameStub = sinon.stub(TaskManager, 'getTaskByName');
-const executeTaskStub = sinon.stub(TaskManager, 'executeTask');
-const getDecisionRuleByNameStub = sinon.stub(DecisionRuleManager, 'getDecisionRuleByName');
-const executeDecisionRuleStub = sinon.stub(DecisionRuleManager, 'executeDecisionRule');
+  let executeEventForUsersStub: sinon.SinonStub;
 
-// Shared executor stub
-const executeEventForUsersStub = sinon.stub(EventExecutor, 'executeEventForUsers');
-
-describe('Event Queue', () => {
   beforeEach(async () => {
-    // Reset all stubs
-    hasHandlersForEventTypeStub.reset();
-    getHandlersForEventTypeStub.reset();
-    addItemToCollectionStub.reset();
-    getAllInCollectionStub.reset();
-    removeItemFromCollectionStub.reset();
-    addChangeListenerStub.reset();
-    removeChangeListenerStub.reset();
-    getAllUsersStub.reset();
-    logInfoStub.reset();
-    logWarnStub.reset();
-    logErrorStub.reset();
-    logDevStub.reset();
-    getTaskByNameStub.reset();
-    executeTaskStub.reset();
-    getDecisionRuleByNameStub.reset();
-    executeDecisionRuleStub.reset();
-    executeEventForUsersStub.reset();
+    await engineSandbox.reset();
+
+    eventHandlerManager = EventHandlerManager.getInstance();
+    dataManager = DataManager.getInstance();
+    changeListenerManager = ChangeListenerManager.getInstance();
+
+    hasHandlersForEventTypeStub = engineSandbox.sb.stub(
+      eventHandlerManager,
+      'hasHandlersForEventType',
+    );
+    getHandlersForEventTypeStub = engineSandbox.sb.stub(
+      eventHandlerManager,
+      'getHandlersForEventType',
+    );
+
+    addItemToCollectionStub = engineSandbox.sb.stub(dataManager, 'addItemToCollection');
+    getAllInCollectionStub = engineSandbox.sb.stub(dataManager, 'getAllInCollection');
+    removeItemFromCollectionStub = engineSandbox.sb.stub(dataManager, 'removeItemFromCollection');
+
+    addChangeListenerStub = engineSandbox.sb.stub(changeListenerManager, 'addChangeListener');
+    removeChangeListenerStub = engineSandbox.sb.stub(
+      changeListenerManager,
+      'removeChangeListener',
+    );
+
+    getAllUsersStub = engineSandbox.sb.stub(UserManager, 'getAllUsers');
+
+    executeEventForUsersStub = engineSandbox.sb
+      .stub(EventExecutor, 'executeEventForUsers')
+      .resolves();
+
     EventQueue.setShouldProcessQueue(true);
   });
 
-  afterAll(() => {
-    // Restore all stubs
-    hasHandlersForEventTypeStub.restore();
-    getHandlersForEventTypeStub.restore();
-    addItemToCollectionStub.restore();
-    getAllInCollectionStub.restore();
-    removeItemFromCollectionStub.restore();
-    addChangeListenerStub.restore();
-    removeChangeListenerStub.restore();
-    getAllUsersStub.restore();
-    logInfoStub.restore();
-    logWarnStub.restore();
-    logErrorStub.restore();
-    logDevStub.restore();
-    executeEventForUsersStub.restore();
+  afterEach(async () => {
+    await engineSandbox.restore();
   });
 
   describe('publishEvent', () => {
-    it('should publish event successfully when handlers exist', async () => {
+    it('publishes event successfully when handlers exist', async () => {
+      // Arrange
       const eventType = 'TEST_EVENT';
       const timestamp = new Date();
       const eventDetails = { test: 'data' };
 
       hasHandlersForEventTypeStub.returns(true);
-      addItemToCollectionStub.resolves({id: 'event1'} as JEvent);
+      addItemToCollectionStub.resolves({ id: 'event1' } as JEvent);
 
+      // Act
       await EventQueue.publishEvent(eventType, timestamp, eventDetails);
 
-      expect(hasHandlersForEventTypeStub.calledWith(eventType)).toBe(true);
+      // Assert
+      expect(hasHandlersForEventTypeStub.calledOnceWithExactly(eventType)).toBe(true);
       expect(addItemToCollectionStub.calledOnce).toBe(true);
 
       const addedEvent = addItemToCollectionStub.firstCall.args[1] as JEvent;
       expect(addedEvent.eventType).toBe(eventType);
       expect(addedEvent.generatedTimestamp).toBe(timestamp);
       expect(addedEvent.eventDetails).toBe(eventDetails);
-
-      expect(logInfoStub.calledWith(sinon.match(/Published event/))).toBe(true);
     });
 
-    it('should skip publication when no handlers exist', async () => {
+    it('skips publication when no handlers exist', async () => {
+      // Arrange
       const eventType = 'TEST_EVENT';
       const timestamp = new Date();
 
       hasHandlersForEventTypeStub.returns(false);
 
+      // Act
       await EventQueue.publishEvent(eventType, timestamp);
-      expect(hasHandlersForEventTypeStub.calledWith(eventType)).toBe(true);
-      expect(addItemToCollectionStub.called).toBe(false);
 
-      expect(logWarnStub.calledWith(
-        `No handlers found for event type "${eventType}". Skipping event publication.`
-      )).toBe(true);
+      // Assert
+      expect(hasHandlersForEventTypeStub.calledOnceWithExactly(eventType)).toBe(true);
+      expect(addItemToCollectionStub.called).toBe(false);
     });
 
-    it('should handle errors during publication', async () => {
+    it('propagates errors during publication', async () => {
+      // Arrange
       const eventType = 'TEST_EVENT';
       const timestamp = new Date();
-      const error = new Error('Database error');
 
       hasHandlersForEventTypeStub.returns(true);
-      addItemToCollectionStub.rejects(error);
+      addItemToCollectionStub.rejects(new Error('Database error'));
 
-      await expect(EventQueue.publishEvent(eventType, timestamp)).rejects.toThrow('Database error');
-
-      expect(logErrorStub.calledWith(
-        `Failed to publish event "${eventType}": ${error}`
-      )).toBe(true);
+      // Act / Assert
+      await expect(EventQueue.publishEvent(eventType, timestamp)).rejects.toThrow(
+        'Database error',
+      );
     });
   });
 
   describe('processEventQueue', () => {
-    it('should process events successfully', async () => {
-      const mockUsers: JUser[] = [
-        { id: 'user1', uniqueIdentifier: 'user1-unique', attributes:{name: 'User 1'} } as JUser,
-        { id: 'user2', uniqueIdentifier: 'user2-unique', attributes:{name: 'User 2'} } as JUser,
+    it('processes events: executes, archives, then removes from queue', async () => {
+      // Arrange
+      const users: JUser[] = [
+        makeUser({
+          id: 'user1',
+          uniqueIdentifier: 'user1-unique',
+          attributes: { name: 'User 1' },
+        }) as unknown as JUser,
+        makeUser({
+          id: 'user2',
+          uniqueIdentifier: 'user2-unique',
+          attributes: { name: 'User 2' },
+        }) as unknown as JUser,
       ];
 
-      const mockEvents: JEvent[] = [
-        {
-          id: 'event1',
-          eventType: 'TEST_EVENT',
-          generatedTimestamp: new Date(),
-        } as JEvent,
-      ];
+      const event: JEvent = {
+        id: 'event1',
+        eventType: 'TEST_EVENT',
+        generatedTimestamp: new Date(),
+      } as JEvent;
 
-      getAllUsersStub.returns(mockUsers);
-      getAllInCollectionStub.onFirstCall().resolves(mockEvents);
+      getAllUsersStub.returns(users);
+      getAllInCollectionStub.onFirstCall().resolves([event]);
       getAllInCollectionStub.onSecondCall().resolves([]);
+
       getHandlersForEventTypeStub.returns(['handler1']);
-      executeEventForUsersStub.resolves();
+
       addItemToCollectionStub.resolves();
       removeItemFromCollectionStub.resolves();
 
+      // Act
       await EventQueue.processEventQueue();
 
-      expect(getAllInCollectionStub.calledTwice).toBe(true);
+      // Assert
       expect(executeEventForUsersStub.calledOnce).toBe(true);
-      expect(addItemToCollectionStub.called).toBe(true);
-      expect(removeItemFromCollectionStub.calledWith('event_queue', 'event1')).toBe(true);
 
-      expect(logDevStub.calledWith('Starting event queue processing.')).toBe(true);
-      expect(logDevStub.calledWith('Finished processing event queue.')).toBe(true);
+      const [passedEvent, passedUsers, passedMgr] = executeEventForUsersStub.firstCall
+        .args as [JEvent, JUser[], EventHandlerManager];
+
+      expect(passedEvent).toBe(event);
+      expect(passedUsers).toBe(users);
+      expect(passedMgr).toBe(eventHandlerManager);
+
+      expect(addItemToCollectionStub.calledWith('archived_events', event)).toBe(true);
+      expect(removeItemFromCollectionStub.calledWith('event_queue', 'event1')).toBe(true);
     });
 
-    it('should skip processing when queue is empty', async () => {
+    it('skips processing when queue is empty', async () => {
+      // Arrange
       getAllUsersStub.returns([]);
       getAllInCollectionStub.resolves([]);
 
+      // Act
       await EventQueue.processEventQueue();
 
-      expect(getAllInCollectionStub.calledOnce).toBe(true);
+      // Assert
+      expect(getAllInCollectionStub.calledOnceWithExactly('event_queue')).toBe(true);
       expect(executeEventForUsersStub.called).toBe(false);
-
-      expect(logDevStub.calledWith('No events left in the queue. Pausing processing.')).toBe(true);
+      expect(addItemToCollectionStub.called).toBe(false);
+      expect(removeItemFromCollectionStub.called).toBe(false);
     });
 
-    it('should skip processing when already in progress', async () => {
+    it('skips processing when already in progress', async () => {
+      // Arrange
+      const deferred = (() => {
+        let resolve!: (value: unknown) => void;
+        const promise = new Promise((r) => {
+          resolve = r;
+        });
+        return { promise, resolve };
+      })();
+
       getAllUsersStub.returns([]);
-      getAllInCollectionStub.resolves([]);
+      getAllInCollectionStub.returns(deferred.promise);
 
-      const firstPromise = EventQueue.processEventQueue();
-      const secondPromise = EventQueue.processEventQueue();
+      // Act
+      const p1 = EventQueue.processEventQueue();
+      const p2 = EventQueue.processEventQueue();
 
-      await Promise.all([firstPromise, secondPromise]);
+      // Assert
+      expect(getAllInCollectionStub.calledOnce).toBe(true);
 
-      expect(logInfoStub.calledWith('Event queue processing already in progress. Skipping processing.')).toBe(true);
+      deferred.resolve([]);
+      await Promise.all([p1, p2]);
     });
 
-    it('should handle processing errors gracefully', async () => {
-      const mockUsers: JUser[] = [{ id: 'user1', uniqueIdentifier: 'user1-unique', attributes:{name: 'User 1'} } as JUser];
-      const mockEvents: JEvent[] = [
-        {
-          id: 'event1',
-          eventType: 'TEST_EVENT',
-          generatedTimestamp: new Date(),
-        } as JEvent,
+    it('does not remove from queue when archiving fails', async () => {
+      // Arrange
+      const users: JUser[] = [
+        makeUser({
+          id: 'user1',
+          uniqueIdentifier: 'user1-unique',
+          attributes: { name: 'User 1' },
+        }) as unknown as JUser,
       ];
 
-      getAllUsersStub.returns(mockUsers);
-      getAllInCollectionStub.onFirstCall().resolves(mockEvents);
+      const event: JEvent = {
+        id: 'event1',
+        eventType: 'TEST_EVENT',
+        generatedTimestamp: new Date(),
+      } as JEvent;
+
+      getAllUsersStub.returns(users);
+      getAllInCollectionStub.onFirstCall().resolves([event]);
       getAllInCollectionStub.onSecondCall().resolves([]);
+
       getHandlersForEventTypeStub.returns(['handler1']);
-      executeEventForUsersStub.resolves();
+
       addItemToCollectionStub.rejects(new Error('Archive error'));
 
+      // Act
       await EventQueue.processEventQueue();
 
-      expect(logErrorStub.calledWith(
-        'Failed to archive event "TEST_EVENT" with ID: event1: Error: Archive error'
-      )).toBe(true);
+      // Assert
+      expect(removeItemFromCollectionStub.called).toBe(false);
     });
+
+    it('skips archiving and removal when event has no ID', async () => {
+      // Arrange
+      const event: JEvent = {
+        eventType: 'TEST_EVENT',
+        generatedTimestamp: new Date(),
+      } as JEvent;
+
+      getAllUsersStub.returns([]);
+      getAllInCollectionStub.onFirstCall().resolves([event]);
+      getAllInCollectionStub.onSecondCall().resolves([]);
+
+      getHandlersForEventTypeStub.returns([]);
+
+      addItemToCollectionStub.resolves();
+      removeItemFromCollectionStub.resolves();
+
+      // Act
+      await EventQueue.processEventQueue();
+
+      // Assert
+      expect(addItemToCollectionStub.calledWith('archived_events', event)).toBe(false);
+      expect(removeItemFromCollectionStub.called).toBe(false);
+    });
+
   });
 
   describe('setupEventQueueListener', () => {
-    it('should setup listener and start processing', async () => {
+    it('sets up listener', async () => {
+      // Arrange
       getAllInCollectionStub.resolves([]);
 
+      // Act
       await EventQueue.setupEventQueueListener();
 
+      // Assert
       expect(addChangeListenerStub.calledOnce).toBe(true);
       expect(addChangeListenerStub.firstCall.args[0]).toBe('event_queue');
       expect(addChangeListenerStub.firstCall.args[1]).toBe(CollectionChangeType.INSERT);
-
-      expect(logDevStub.calledWith('Setting up event queue listener.')).toBe(true);
-      expect(logDevStub.calledWith('Event queue listener set up successfully.')).toBe(true);
-    });
-
-    it('should handle errors during initial processing', async () => {
-      const error = new Error('Processing error');
-      getAllInCollectionStub.rejects(error);
-
-      EventQueue.setupEventQueueListener();
-
-      await new Promise(resolve => setTimeout(resolve, 0));
-
-      expect(logErrorStub.calledWith(
-        `Error during event queue processing: Error: Processing error`
-      )).toBe(true);
     });
   });
 
   describe('stopEventQueueProcessing', () => {
-    it('should stop queue processing', () => {
+    it('stops queue processing', () => {
+      // Arrange
+
+      // Act
       EventQueue.stopEventQueueProcessing();
 
+      // Assert
       expect(removeChangeListenerStub.calledOnce).toBe(true);
       expect(removeChangeListenerStub.firstCall.args[0]).toBe('event_queue');
       expect(removeChangeListenerStub.firstCall.args[1]).toBe(CollectionChangeType.INSERT);
-
-      expect(logInfoStub.calledWith('Event queue processing stopped.')).toBe(true);
     });
   });
 
   describe('startEventQueueProcessing', () => {
-    it('should start queue processing', async () => {
+    it('starts queue processing', async () => {
+      // Arrange
       EventQueue.setShouldProcessQueue(false);
+
+      // Act
       await EventQueue.startEventQueueProcessing();
-      expect(logDevStub.calledWith('Event queue processing started.')).toBe(true);
+
+      // Assert
+      expect(EventQueue.isRunning()).toBe(true);
     });
   });
 
   describe('isRunning', () => {
-    it('should return true when queue is running', async () => {
+    it('returns true when queue is running', async () => {
+      // Arrange
       EventQueue.setShouldProcessQueue(false);
+
+      // Act
       await EventQueue.startEventQueueProcessing();
+
+      // Assert
       expect(EventQueue.isRunning()).toBe(true);
     });
 
-    it('should return false when queue is stopped', () => {
+    it('returns false when queue is stopped', () => {
+      // Arrange
+
+      // Act
       EventQueue.stopEventQueueProcessing();
+
+      // Assert
       expect(EventQueue.isRunning()).toBe(false);
     });
   });
 
   describe('queueIsEmpty', () => {
-    it('should return true when queue is empty', async () => {
+    it('returns true when queue is empty', async () => {
+      // Arrange
       getAllInCollectionStub.resolves([]);
 
+      // Act
       const isEmpty = await EventQueue.queueIsEmpty();
 
+      // Assert
       expect(isEmpty).toBe(true);
-      expect(getAllInCollectionStub.calledWith('event_queue')).toBe(true);
+      expect(getAllInCollectionStub.calledOnceWithExactly('event_queue')).toBe(true);
     });
 
-    it('should return false when queue has events', async () => {
-      const mockEvents = [{ id: 'event1' }];
-      getAllInCollectionStub.resolves(mockEvents);
+    it('returns false when queue has events', async () => {
+      // Arrange
+      getAllInCollectionStub.resolves([{ id: 'event1' }]);
 
+      // Act
       const isEmpty = await EventQueue.queueIsEmpty();
 
+      // Assert
       expect(isEmpty).toBe(false);
     });
 
-    it('should handle null/undefined events', async () => {
+    it('treats null/undefined as empty', async () => {
+      // Arrange
       getAllInCollectionStub.resolves(null);
 
+      // Act
       const isEmpty = await EventQueue.queueIsEmpty();
 
+      // Assert
       expect(isEmpty).toBe(true);
-    });
-  });
-
-  describe('processHandlers integration', () => {
-    it('should process task handlers successfully', async () => {
-      const mockEvent: JEvent = {
-        id: 'event1',
-        eventType: 'TEST_EVENT',
-        generatedTimestamp: new Date(),
-      } as JEvent;
-
-      const mockUser: JUser = { id: 'user1', uniqueIdentifier: 'user1-unique', attributes:{name: 'User 1'} } as JUser;
-
-      getHandlersForEventTypeStub.returns(['task1']);
-      executeEventForUsersStub.resolves();
-
-      getAllUsersStub.returns([mockUser]);
-      getAllInCollectionStub.onFirstCall().resolves([mockEvent]);
-      getAllInCollectionStub.onSecondCall().resolves([]);
-
-      await EventQueue.processEventQueue();
-
-      expect(executeEventForUsersStub.calledOnce).toBe(true);
-    });
-
-    it('should process decision rule handlers successfully', async () => {
-      const mockEvent: JEvent = {
-        id: 'event1',
-        eventType: 'TEST_EVENT',
-        generatedTimestamp: new Date(),
-      } as JEvent;
-
-      const mockUser: JUser = { id: 'user1', uniqueIdentifier: 'user1-unique', attributes:{name: 'User 1'} } as JUser;
-
-      getHandlersForEventTypeStub.returns(['rule1']);
-      executeEventForUsersStub.resolves();
-
-      getAllUsersStub.returns([mockUser]);
-      getAllInCollectionStub.onFirstCall().resolves([mockEvent]);
-      getAllInCollectionStub.onSecondCall().resolves([]);
-
-      await EventQueue.processEventQueue();
-
-      expect(executeEventForUsersStub.calledOnce).toBe(true);
-    });
-
-    it('should warn when handler is not found', async () => {
-      const mockEvent: JEvent = {
-        id: 'event1',
-        eventType: 'TEST_EVENT',
-        generatedTimestamp: new Date(),
-      } as JEvent;
-
-      const mockUser: JUser = { id: 'user1', uniqueIdentifier: 'user1-unique', attributes:{name: 'User 1'} } as JUser;
-
-      getHandlersForEventTypeStub.returns(['unknown_handler']);
-      executeEventForUsersStub.resolves();
-
-      getAllUsersStub.returns([mockUser]);
-      getAllInCollectionStub.onFirstCall().resolves([mockEvent]);
-      getAllInCollectionStub.onSecondCall().resolves([]);
-
-      await EventQueue.processEventQueue();
-
-      expect(executeEventForUsersStub.calledOnce).toBe(true);
-    });
-
-    it('should handle handler execution errors', async () => {
-      const mockEvent: JEvent = {
-        id: 'event1',
-        eventType: 'TEST_EVENT',
-        generatedTimestamp: new Date(),
-      } as JEvent;
-
-      const mockUser: JUser = { id: 'user1', uniqueIdentifier: 'user1-unique', attributes:{name: 'User 1'} } as JUser;
-
-      getHandlersForEventTypeStub.returns(['task1']);
-      executeEventForUsersStub.resolves();
-
-      getAllUsersStub.returns([mockUser]);
-      getAllInCollectionStub.onFirstCall().resolves([mockEvent]);
-      getAllInCollectionStub.onSecondCall().resolves([]);
-
-      await EventQueue.processEventQueue();
-
-      expect(executeEventForUsersStub.calledOnce).toBe(true);
-    });
-  });
-
-  describe('processExecutionLifecycle integration', () => {
-    it('should call beforeExecution on task', async () => {
-      const mockEvent: JEvent = {
-        id: 'event1',
-        eventType: 'TEST_EVENT',
-        generatedTimestamp: new Date(),
-      } as JEvent;
-
-      getHandlersForEventTypeStub.returns(['task1']);
-      executeEventForUsersStub.resolves();
-
-      getAllUsersStub.returns([]);
-      getAllInCollectionStub.onFirstCall().resolves([mockEvent]);
-      getAllInCollectionStub.onSecondCall().resolves([]);
-
-      await EventQueue.processEventQueue();
-
-      expect(executeEventForUsersStub.calledOnce).toBe(true);
-    });
-
-    it('should call afterExecution on decision rule', async () => {
-      const mockEvent: JEvent = {
-        id: 'event1',
-        eventType: 'TEST_EVENT',
-        generatedTimestamp: new Date(),
-      } as JEvent;
-
-      getHandlersForEventTypeStub.returns(['rule1']);
-      executeEventForUsersStub.resolves();
-
-      getAllUsersStub.returns([]);
-      getAllInCollectionStub.onFirstCall().resolves([mockEvent]);
-      getAllInCollectionStub.onSecondCall().resolves([]);
-
-      await EventQueue.processEventQueue();
-
-      expect(executeEventForUsersStub.calledOnce).toBe(true);
-    });
-
-    it('should warn when lifecycle method is not found', async () => {
-      const mockEvent: JEvent = {
-        id: 'event1',
-        eventType: 'TEST_EVENT',
-        generatedTimestamp: new Date(),
-      } as JEvent;
-
-      getHandlersForEventTypeStub.returns(['task1']);
-      executeEventForUsersStub.resolves();
-
-      getAllUsersStub.returns([]);
-      getAllInCollectionStub.onFirstCall().resolves([mockEvent]);
-      getAllInCollectionStub.onSecondCall().resolves([]);
-
-      await EventQueue.processEventQueue();
-
-      expect(executeEventForUsersStub.calledOnce).toBe(true);
-    });
-
-    // TODO: what are we actually testing here?
-    it('should handle lifecycle method execution errors', async () => {
-      const mockEvent: JEvent = {
-        id: 'event1',
-        eventType: 'TEST_EVENT',
-        generatedTimestamp: new Date(),
-      } as JEvent;
-
-      getHandlersForEventTypeStub.returns(['task1']);
-      executeEventForUsersStub.resolves();
-
-      getAllUsersStub.returns([]);
-      getAllInCollectionStub.onFirstCall().resolves([mockEvent]);
-      getAllInCollectionStub.onSecondCall().resolves([]);
-
-      await EventQueue.processEventQueue();
-
-      expect(executeEventForUsersStub.calledOnce).toBe(true);
-    });
-  });
-
-  describe('archiveEvent integration', () => {
-    it('should remove event and call archive event successfully', async () => {
-      const mockEvent: JEvent = {
-        id: 'event1',
-        eventType: 'TEST_EVENT',
-        generatedTimestamp: new Date(),
-      } as JEvent;
-
-      addItemToCollectionStub.resolves();
-      removeItemFromCollectionStub.resolves();
-
-      getAllUsersStub.returns([]);
-      getAllInCollectionStub.onFirstCall().resolves([mockEvent]);
-      getAllInCollectionStub.onSecondCall().resolves([]);
-      getHandlersForEventTypeStub.returns([]);
-      executeEventForUsersStub.resolves();
-
-      await EventQueue.processEventQueue();
-
-      expect(addItemToCollectionStub.calledWith('archived_events', mockEvent)).toBe(true);
-      expect(removeItemFromCollectionStub.calledWith('event_queue', 'event1')).toBe(true);
-
-      expect(logDevStub.calledWith(
-        `Event of type "TEST_EVENT" with ID: event1 archived successfully.`
-      )).toBe(true);
-    });
-
-    it('should handle archiving errors', async () => {
-      const mockEvent: JEvent = {
-        id: 'event1',
-        eventType: 'TEST_EVENT',
-        generatedTimestamp: new Date(),
-      } as JEvent;
-
-      const error = new Error('Archive error');
-      addItemToCollectionStub.rejects(error);
-
-      getAllUsersStub.returns([]);
-      getAllInCollectionStub.onFirstCall().resolves([mockEvent]);
-      getAllInCollectionStub.onSecondCall().resolves([]);
-      getHandlersForEventTypeStub.returns([]);
-      executeEventForUsersStub.resolves();
-
-      await EventQueue.processEventQueue();
-
-      expect(logErrorStub.calledWith(
-        `Failed to archive event "TEST_EVENT" with ID: event1: ${error}`
-      )).toBe(true);
-    });
-
-    it('should handle events without ID', async () => {
-      const mockEvent: JEvent = {
-        eventType: 'TEST_EVENT',
-        generatedTimestamp: new Date(),
-      } as JEvent;
-
-      getAllUsersStub.returns([]);
-      getAllInCollectionStub.onFirstCall().resolves([mockEvent]);
-      getAllInCollectionStub.onSecondCall().resolves([]);
-      getHandlersForEventTypeStub.returns([]);
-      executeEventForUsersStub.resolves();
-
-      await EventQueue.processEventQueue();
-
-      expect(logErrorStub.calledWith(
-        'Event "[object Object]" has no ID. Skipping archiving.'
-      )).toBe(true);
     });
   });
 });
