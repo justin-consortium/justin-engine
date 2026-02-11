@@ -95,12 +95,23 @@ export async function executeTask(
     });
   } finally {
     if (results.length > 0) {
-      await handleTaskResult({
-        event,
-        name: task.name,
-        steps: results,
-        user,
-      });
+      try{
+        await handleTaskResult({
+          event,
+          name: task.name,
+          steps: results,
+          user,
+        });
+      } catch(error) {
+        Log.error(
+          'Error executing task for user.',
+          { taskName: task.name, user, event, error, });
+        results.push({
+          step: 'unknown',
+          result: { status: 'error', error, },
+          timestamp: new Date(),
+        });
+      }
     }
     Log.info('Completed execution of task for user.', {
       taskName: task.name,
@@ -110,3 +121,10 @@ export async function executeTask(
     });
   }
 }
+
+/**
+ * Clears all registered tasks (primarily for tests).
+ */
+export const _clearRegisteredTasks = (): void => {
+  tasks.clear();
+};
