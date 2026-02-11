@@ -1,7 +1,5 @@
-import {
-  JUser,
-  createLogger,
-} from '@just-in/core';
+import { createLogger } from '@just-in/core';
+import type { JUser } from '@just-in/core';
 import type { JEvent } from './event.type';
 import { EventHandlerManager } from './event-handler-manager';
 import { getTaskByName, executeTask } from '../handlers/task.manager';

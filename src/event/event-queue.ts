@@ -1,4 +1,5 @@
-import DataManager, {
+import {
+  DataManager,
   ChangeListenerManager,
   UserManager,
   CollectionChangeType,
@@ -236,9 +237,9 @@ const archiveEvent = async (event: JEvent): Promise<void> => {
   try {
     Log.debug('Archiving event.', { event });
 
-    await dataManager.addItemToCollection(ARCHIVED_EVENTS, event);
 
     if (event.id) {
+      await dataManager.addItemToCollection(ARCHIVED_EVENTS, event);
       await dataManager.removeItemFromCollection(EVENT_QUEUE, event.id);
     } else {
       Log.error('Event has no ID; skipping removal from EVENTS_QUEUE.', {

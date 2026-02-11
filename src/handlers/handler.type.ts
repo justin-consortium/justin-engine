@@ -1,4 +1,4 @@
-import { JUser } from '@just-in/core';
+import type { JUser } from '@just-in/core';
 import { JEvent } from '../event/event.type';
 
 export type StepReturnResult<T = any> = {

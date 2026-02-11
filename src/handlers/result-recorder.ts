@@ -1,4 +1,4 @@
-import DataManager, { createLogger } from '@just-in/core';
+import { DataManager, createLogger } from '@just-in/core';
 import { RecordResult, RecordResultFunction } from './handler.type';
 import { DECISION_RULE_RESULTS, TASK_RESULTS } from '../constants';
 
