@@ -24,4 +24,11 @@ export {
   __resetResultRecorderForTests,
 } from './result-recorder';
 
-export { registerTask, getTaskByName, executeTask, _clearRegisteredTasks } from './task-manager';
+export { registerTask, getTaskByName, executeTask, _clearRegisteredTasks } from './task.manager';
+
+export {
+  registerDecisionRule,
+  getDecisionRuleByName,
+  executeDecisionRule,
+  _clearRegisteredDecisionRules,
+} from './decision-rule.manager';

@@ -5,7 +5,7 @@ import {
   getTaskByName,
   executeTask,
   _clearRegisteredTasks,
-} from '../task-manager';
+} from '../task.manager';
 import * as Steps from '../steps';
 import * as ResultRecorder from '../result-recorder';
 import { HandlerType, TaskStep } from '../types';
