@@ -11,3 +11,4 @@ export {
   queueIsEmpty,
   _setShouldProcessQueue,
 } from './queue';
+export { IntervalTimerEventGenerator } from './timer';
