@@ -1,23 +1,17 @@
 import { _resetEngine } from '../../engine';
-import { EventHandlerManager } from '../../event';
+import { EventHandlerManager } from '../../event/manager';
 import { _clearRegisteredTasks, _clearRegisteredDecisionRules, __resetResultRecorderForTests } from '../../handlers';
 import { resetRegisterCounters } from './register';
 
 /**
  * Resets all engine in-memory registries to a clean state.
  *
- * Clears:
- * - Engine module state (`_isInitialized`, interval timers)
- * - All registered event handlers
- * - All registered tasks and decision rules
- * - Result recorder state
- * - Register name counters
+ * Clears engine module state, event handlers, tasks, decision rules, result
+ * recorder state, and register name counters. Each step is wrapped
+ * independently so a single failure does not prevent the rest from running.
  *
- * Safe to call multiple times. Each step is wrapped independently so a
- * single failure does not prevent the rest from running.
- *
- * Called automatically by {@link makeEngineSandbox} `reset()` and
- * `restore()`. Only call this directly if you are not using the sandbox.
+ * Only call this directly if you are not using {@link makeEngineSandbox} —
+ * the sandbox calls this automatically in `restore()`.
  */
 function resetEngineState(): void {
   try { _resetEngine(); } catch {}

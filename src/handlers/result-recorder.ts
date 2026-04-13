@@ -9,7 +9,6 @@ const Log = createLogger({
 let _recordDecisionRuleResultFn: RecordResultFunction | null = null;
 let _recordTaskResultFn: RecordResultFunction | null = null;
 let _persistenceEnabled = true;
-let _dm: ReturnType<typeof DataManager.getInstance> | null = null;
 
 /**
  * Enables or disables DataManager persistence for result recording.
@@ -24,23 +23,10 @@ let _dm: ReturnType<typeof DataManager.getInstance> | null = null;
  * Custom writers registered via {@link setDecisionRuleResultRecorder} or
  * {@link setTaskResultRecorder} are always called regardless of this flag.
  *
- * Defaults to `true`. Resets the lazy DM reference so the next enabled call
- * gets a fresh instance.
+ * Defaults to `true`.
  */
 function setResultRecorderPersistenceEnabled(enabled: boolean): void {
   _persistenceEnabled = enabled;
-  _dm = null;
-}
-
-function _getDataManagerSafe(): ReturnType<typeof DataManager.getInstance> | null {
-  if (!_persistenceEnabled) return null;
-  if (_dm) return _dm;
-  try {
-    _dm = DataManager.getInstance();
-  } catch {
-    _dm = null;
-  }
-  return _dm;
 }
 
 /**
@@ -70,11 +56,9 @@ function setDecisionRuleResultRecorder(fn: RecordResultFunction): void {
  * When set, **completely replaces** the default persistence path — DataManager
  * is never called. Falls through to the decision rule writer if no task writer
  * is configured, so a single writer registered via
- * `configureDecisionRuleResultWriter` can handle results from both tasks and
- * decision rules.
+ * `configureDecisionRuleResultWriter` can handle results from both handler types.
  *
- * If the writer throws, the recorder logs a warning and falls back to the
- * default path.
+ * If the writer throws, the recorder logs a warning and falls back.
  *
  * Called via `JustIn.configureTaskResultWriter(fn)` on the engine facade —
  * do not call this directly in application code.
@@ -107,11 +91,9 @@ async function _persistOrLog(
   record: RecordResult,
   kind: 'task' | 'decision',
 ): Promise<void> {
-  const dm = _getDataManagerSafe();
-
-  if (dm) {
+  if (_persistenceEnabled) {
     try {
-      const result = await dm.addItemToCollection(collection, record);
+      const result = await DataManager.getInstance().addItemToCollection(collection, record);
       if (result.ok) return;
       Log.warn('Result recorder: DataManager returned failure — result not persisted.', {
         collection,
@@ -173,8 +155,8 @@ async function handleDecisionRuleResult(record: RecordResult): Promise<void> {
  * Resolution order:
  * 1. Custom task writer if set — **replaces** DataManager entirely.
  *    Configure via `JustIn.configureTaskResultWriter(fn)`.
- * 2. Custom decision rule writer if set and no task writer is configured —
- *    a single writer can handle results from both tasks and decision rules.
+ * 2. Custom decision rule writer if set — tasks delegate to it when no task
+ *    writer is configured, so a single writer can handle all handler results.
  * 3. DataManager persistence to `task_results` (DB-backed engine only).
  * 4. INFO log with the full record — serverless engine default, or DB-backed
  *    engine fallback when DataManager fails.
@@ -229,7 +211,6 @@ function hasResultRecord(record: RecordResult): boolean {
 function __resetResultRecorderForTests(): void {
   _recordDecisionRuleResultFn = null;
   _recordTaskResultFn = null;
-  _dm = null;
   _persistenceEnabled = true;
 }
 

@@ -1,7 +1,7 @@
 import {
+  createLogger,
   UserManager,
   shutdownCore,
-  createLogger,
 } from '@just-in/core';
 import {
   EventHandlerManager, IntervalTimerEventGenerator,
@@ -10,10 +10,13 @@ import {
   startEventQueueProcessing,
   stopEventQueueProcessing,
 } from '../event';
-import type { IntervalTimerEventGeneratorOptions } from '../event'
-import { registerTask as _registerTask, registerDecisionRule as _registerDecisionRule, _clearRegisteredTasks , _clearRegisteredDecisionRules } from '../handlers';
-import { __resetResultRecorderForTests } from '../handlers';
+import type { IntervalTimerEventGeneratorOptions } from '../event';
 import {
+  registerTask as _registerTask,
+  registerDecisionRule as _registerDecisionRule,
+  _clearRegisteredTasks,
+  _clearRegisteredDecisionRules,
+  __resetResultRecorderForTests,
   setDecisionRuleResultRecorder,
   setTaskResultRecorder,
 } from '../handlers';
@@ -27,6 +30,20 @@ let _isInitialized = false;
 const _intervalTimers = new Map<string, IntervalTimerEventGenerator>();
 
 /**
+ * Internal reference object for core functions that need to be stubbable
+ * in unit tests. Plain objects have writable properties — unlike ES module
+ * namespace imports which produce getter-only properties that sinon cannot
+ * replace. Stays private to this module.
+ *
+ * Once @just-in/core is linked via `yarn link` and the ES module issue no
+ * longer applies in the test environment, this can be replaced with direct
+ * calls.
+ *
+ * @internal
+ */
+const _core = { UserManager, shutdownCore };
+
+/**
  * The DB-backed JustIn engine.
  *
  * Manages the full JITAI lifecycle for long-running server processes:
@@ -37,8 +54,7 @@ const _intervalTimers = new Map<string, IntervalTimerEventGenerator>();
  * ## Prerequisites
  *
  * `configureDB` from `@just-in/core` must be called before `init()`.
- * `UserManager.init()` is called internally by `init()` — do not call it
- * separately unless you are also initialising other core managers.
+ * `UserManager.init()` is called internally by `init()`.
  *
  * ## Startup sequence
  *
@@ -46,10 +62,8 @@ const _intervalTimers = new Map<string, IntervalTimerEventGenerator>();
  * import { configureDB, DBType, UserManager } from '@just-in/core';
  * import { JustIn } from '@just-in/engine';
  *
- * // 1. Configure the database connection (once at app startup)
  * configureDB({ dbType: DBType.MONGO, uri: process.env.MONGO_URI });
  *
- * // 2. Register handlers
  * JustIn.registerTask(FitbitUpdaterTask);
  * JustIn.registerDecisionRule(WalkingSuggestionDecisionRule);
  * await JustIn.registerEventHandlers('CLOCK_EVENT', [
@@ -57,11 +71,7 @@ const _intervalTimers = new Map<string, IntervalTimerEventGenerator>();
  *   WalkingSuggestionDecisionRule.name,
  * ]);
  *
- * // 3. Initialise — wires UserManager, collections, caches, change listeners
  * await JustIn.init();
- *
- * // 4. Start the engine — wires the event queue listener and drains any
- * //    pending events
  * await JustIn.startEngine();
  * ```
  *
@@ -76,17 +86,12 @@ const _intervalTimers = new Map<string, IntervalTimerEventGenerator>();
  */
 const JustIn = {
 
-  // ---------------------------------------------------------------------------
-  // Lifecycle
-  // ---------------------------------------------------------------------------
-
   /**
    * Initialises the engine.
    *
    * Calls `UserManager.init()` which initialises DataManager using the config
-   * stored by `configureDB()`, ensures the `users` and `protected_attributes`
-   * collections exist, populates the in-memory caches, and wires change
-   * listeners.
+   * stored by `configureDB()`, ensures collections exist, populates caches,
+   * and wires change listeners.
    *
    * Idempotent — subsequent calls are no-ops with a warning.
    *
@@ -97,8 +102,7 @@ const JustIn = {
       Log.warn('JustInEngine is already initialized.');
       return;
     }
-
-    await UserManager.init();
+    await _core.UserManager.init();
     _isInitialized = true;
     Log.info('JustInEngine initialized.');
   },
@@ -117,13 +121,12 @@ const JustIn = {
       Log.warn('JustInEngine is not initialized; skipping shutdown.');
       return;
     }
-
     try {
       await JustIn.stopEngine();
       _intervalTimers.clear();
       EventHandlerManager.getInstance().clearEventHandlers();
       _isInitialized = false;
-      await shutdownCore();
+      await _core.shutdownCore();
       Log.info('JustInEngine shut down.');
     } catch (error) {
       Log.error('Error during JustInEngine shutdown.', { error });
@@ -131,30 +134,22 @@ const JustIn = {
     }
   },
 
-  // ---------------------------------------------------------------------------
-  // Engine start / stop
-  // ---------------------------------------------------------------------------
-
   /**
    * Starts event queue processing and all registered interval timers.
    *
-   * Wires the change stream listener on `event_queue` so new events trigger
-   * processing automatically, then drains any events already in the queue.
-   * Also starts any interval timers registered via
+   * Wires the change stream listener on `event_queue` and drains any
+   * pending events. Also starts any interval timers registered via
    * {@link createIntervalTimerEventGenerator}.
    *
    * Call after `init()`.
    */
   async startEngine(): Promise<void> {
     Log.debug('Starting engine...');
-
     await startEventQueueProcessing();
-
     _intervalTimers.forEach((timer, eventTypeName) => {
       Log.info('Starting interval timer.', { eventTypeName });
       timer.start();
     });
-
     await processEventQueue();
     Log.info('Engine started.', { startedAt: new Date().toISOString() });
   },
@@ -162,8 +157,7 @@ const JustIn = {
   /**
    * Stops event queue processing and all interval timers.
    *
-   * Can be called without shutting down the application — use this to pause
-   * the engine temporarily. Call `startEngine()` to resume.
+   * Can be called without shutting down the application.
    */
   async stopEngine(): Promise<void> {
     _intervalTimers.forEach((timer, eventTypeName) => {
@@ -173,10 +167,6 @@ const JustIn = {
     stopEventQueueProcessing();
     Log.info('Engine stopped.');
   },
-
-  // ---------------------------------------------------------------------------
-  // Handler registration
-  // ---------------------------------------------------------------------------
 
   /**
    * Registers a Task with the engine.
@@ -199,12 +189,8 @@ const JustIn = {
   /**
    * Registers an ordered array of handler names for an event type.
    *
-   * The order of `handlers` is the execution order. Each handler runs its
-   * full user sweep before the next handler starts. Tasks that write data
+   * The order of `handlers` is the execution order. Tasks that write data
    * onto `user.attributes` must appear before Decision Rules that read it.
-   *
-   * Every name in `handlers` must already be registered via `registerTask`
-   * or `registerDecisionRule`.
    *
    * @param eventType        - The event type name.
    * @param handlers         - Ordered handler names.
@@ -232,20 +218,8 @@ const JustIn = {
     EventHandlerManager.getInstance().unregisterEventHandlers(eventType);
   },
 
-  // ---------------------------------------------------------------------------
-  // Events
-  // ---------------------------------------------------------------------------
-
   /**
    * Publishes an event by inserting it into the `event_queue` collection.
-   *
-   * The change stream listener wired by `startEngine()` will pick up the
-   * insert and trigger queue processing automatically. If `startEngine()` has
-   * not been called, call `processEventQueue()` manually or use
-   * `setupEventQueueListener()`.
-   *
-   * Silently skips publication if no handlers are registered for the event
-   * type.
    *
    * @param eventType          - The registered event type name.
    * @param generatedTimestamp - The logical event timestamp.
@@ -260,21 +234,13 @@ const JustIn = {
     await _publishEvent(eventType, generatedTimestamp, eventDetails);
   },
 
-  // ---------------------------------------------------------------------------
-  // Interval timers
-  // ---------------------------------------------------------------------------
-
   /**
    * Creates and registers an interval timer that publishes events on a fixed
-   * schedule.
-   *
-   * The timer is not started until `startEngine()` is called. Registering a
-   * timer with the same `eventTypeName` overwrites the previous registration.
+   * schedule. Not started until `startEngine()` is called.
    *
    * @param eventTypeName - The event type to publish on each tick.
    * @param intervalInMs  - The interval between ticks in milliseconds.
    * @param options       - Optional simulated mode configuration.
-   *   See {@link IntervalTimerEventGeneratorOptions}.
    */
   createIntervalTimerEventGenerator(
     eventTypeName: string,
@@ -287,19 +253,12 @@ const JustIn = {
     );
   },
 
-  // ---------------------------------------------------------------------------
-  // Result writers
-  // ---------------------------------------------------------------------------
-
   /**
    * Registers a custom writer for Task results.
    *
    * **Replaces** the default DataManager persistence path — DataManager is
    * never called when a writer is set. Use this to route task execution
    * records to your own analytics pipeline, database, or logging service.
-   *
-   * If the writer throws, the engine logs a warning and falls back to the
-   * default DataManager path so results are never silently lost.
    *
    * @param writer - The result writer function. See {@link RecordResultFunction}.
    */
@@ -311,12 +270,7 @@ const JustIn = {
    * Registers a custom writer for Decision Rule results.
    *
    * **Replaces** the default DataManager persistence path. A single decision
-   * rule writer also handles Task results when no task writer is configured —
-   * register only this writer if you want a single sink for all handler
-   * results.
-   *
-   * If the writer throws, the engine logs a warning and falls back to the
-   * default DataManager path.
+   * rule writer also handles Task results when no task writer is configured.
    *
    * @param writer - The result writer function. See {@link RecordResultFunction}.
    */
@@ -325,11 +279,6 @@ const JustIn = {
   },
 };
 
-/**
- * Resets all engine module-level state.
- *
- * @internal — exported for use in `@just-in/engine/testing` only.
- */
 function _resetEngine(): void {
   _isInitialized = false;
   _intervalTimers.clear();
@@ -339,13 +288,8 @@ function _resetEngine(): void {
   __resetResultRecorderForTests();
 }
 
-/**
- * Returns the internal interval timer map.
- *
- * @internal — exported for use in `@just-in/engine/testing` only.
- */
 function _getIntervalTimers(): Map<string, IntervalTimerEventGenerator> {
   return _intervalTimers;
 }
 
-export { JustIn, _resetEngine, _getIntervalTimers };
+export { JustIn, _resetEngine, _getIntervalTimers, _core as _coreForTesting };

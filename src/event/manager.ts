@@ -106,7 +106,7 @@ class EventHandlerManager {
       Log.warn('No handlers found for event type.', { eventType });
       return [];
     }
-    return this.handlerMap.get(eventType) ?? [];
+    return [...(this.handlerMap.get(eventType) ?? [])];
   };
 
   /**
@@ -128,7 +128,7 @@ class EventHandlerManager {
     this.handlerMap.clear();
     Log.debug('All event handlers cleared.');
   };
-  
+
   private _validate(eventType: string, handlerNames: string[]): void {
     if (!eventType || typeof eventType !== 'string') {
       Log.error('Invalid event type.', { eventType });
