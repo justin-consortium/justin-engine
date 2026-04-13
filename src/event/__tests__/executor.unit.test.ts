@@ -1,4 +1,5 @@
 import sinon from 'sinon';
+import type { EngineSandbox } from '../../testing';
 import {
   makeEngineSandbox,
   makeEvent,
@@ -11,34 +12,27 @@ import { executeEventForUsers } from '../executor';
 import * as TaskManager from '../../handlers/task.manager';
 import * as DecisionRuleManager from '../../handlers/decision-rule.manager';
 
-describe('event/executor — executeEventForUsers', () => {
-  const engineSandbox = makeEngineSandbox();
+describe('event/executor — unit test', () => {
+  let engineSandbox: EngineSandbox;
   let mgr: EventHandlerManager;
 
   beforeEach(async () => {
-    engineSandbox.reset();
+    engineSandbox = makeEngineSandbox();
     mgr = EventHandlerManager.getInstance();
   });
 
-  afterEach(() => {
-    engineSandbox.restore();
-  });
+  afterEach(() => engineSandbox.restore());
 
   const user1 = makeEngineTestUser({ id: 'u1', uniqueIdentifier: 'alice' });
   const user2 = makeEngineTestUser({ id: 'u2', uniqueIdentifier: 'bob' });
 
   describe('no handlers registered', () => {
     it('resolves without error when no handlers are registered for the event type', async () => {
-      const event = makeEvent({ eventType: 'UNKNOWN' });
-
-      await expect(
-        executeEventForUsers(event, [user1], mgr),
-      ).resolves.toBeUndefined();
+      await expect(executeEventForUsers(makeEvent({ eventType: 'UNKNOWN' }), [user1], mgr)).resolves.toBeUndefined();
     });
 
     it('logs a warning when no handlers are registered', async () => {
       await executeEventForUsers(makeEvent({ eventType: 'UNKNOWN' }), [user1], mgr);
-
       const warnLogs = engineSandbox.logs.findByMessage('No handlers registered');
       expect(warnLogs).toHaveLength(1);
       expect(warnLogs[0].entry.severity).toBe('WARNING');
@@ -104,9 +98,7 @@ describe('event/executor — executeEventForUsers', () => {
     it('calls executeDecisionRule for each user', async () => {
       registerTestDecisionRule({ name: 'myRule' });
       await mgr.registerEventHandlers('EV', ['myRule']);
-      const executeRuleStub = engineSandbox.sb
-        .stub(DecisionRuleManager, 'executeDecisionRule')
-        .resolves();
+      const executeRuleStub = engineSandbox.sb.stub(DecisionRuleManager, 'executeDecisionRule').resolves();
 
       await executeEventForUsers(makeEvent({ eventType: 'EV' }), [user1, user2], mgr);
 
@@ -117,19 +109,13 @@ describe('event/executor — executeEventForUsers', () => {
   describe('mixed task and decision rule pipeline', () => {
     it('runs handlers in registration order', async () => {
       const order: string[] = [];
-
       registerTestTask({ name: 'task1' });
       registerTestDecisionRule({ name: 'rule1' });
       registerTestTask({ name: 'task2' });
-
       await mgr.registerEventHandlers('EV', ['task1', 'rule1', 'task2']);
 
-      engineSandbox.sb.stub(TaskManager, 'executeTask').callsFake(async (t) => {
-        order.push(t.name);
-      });
-      engineSandbox.sb.stub(DecisionRuleManager, 'executeDecisionRule').callsFake(async (r) => {
-        order.push(r.name);
-      });
+      engineSandbox.sb.stub(TaskManager, 'executeTask').callsFake(async (t) => { order.push(t.name); });
+      engineSandbox.sb.stub(DecisionRuleManager, 'executeDecisionRule').callsFake(async (r) => { order.push(r.name); });
 
       await executeEventForUsers(makeEvent({ eventType: 'EV' }), [user1], mgr);
 
@@ -138,26 +124,20 @@ describe('event/executor — executeEventForUsers', () => {
 
     it('completes the full user sweep for each handler before starting the next', async () => {
       const log: string[] = [];
-
       registerTestTask({ name: 'fetchTask' });
       registerTestDecisionRule({ name: 'decideRule' });
       await mgr.registerEventHandlers('EV', ['fetchTask', 'decideRule']);
 
       engineSandbox.sb.stub(TaskManager, 'executeTask').callsFake(async (_t, _e, u) => {
-        log.push(`fetch:${(u as Record<string, unknown>)['uniqueIdentifier']}`);
+        log.push(`fetch:${u.uniqueIdentifier}`);
       });
       engineSandbox.sb.stub(DecisionRuleManager, 'executeDecisionRule').callsFake(async (_r, _e, u) => {
-        log.push(`decide:${(u as Record<string, unknown>)['uniqueIdentifier']}`);
+        log.push(`decide:${u.uniqueIdentifier}`);
       });
 
       await executeEventForUsers(makeEvent({ eventType: 'EV' }), [user1, user2], mgr);
 
-      expect(log).toEqual([
-        'fetch:alice',
-        'fetch:bob',
-        'decide:alice',
-        'decide:bob',
-      ]);
+      expect(log).toEqual(['fetch:alice', 'fetch:bob', 'decide:alice', 'decide:bob']);
     });
   });
 
@@ -190,10 +170,7 @@ describe('event/executor — executeEventForUsers', () => {
     });
 
     it('continues the user sweep when beforeExecution throws', async () => {
-      registerTestTask({
-        name: 'beforeErrorTask',
-        beforeExecution: async () => { throw new Error('before failed'); },
-      });
+      registerTestTask({ name: 'beforeErrorTask', beforeExecution: async () => { throw new Error('before failed'); } });
       await mgr.registerEventHandlers('EV', ['beforeErrorTask']);
       const executeTaskStub = engineSandbox.sb.stub(TaskManager, 'executeTask').resolves();
 
@@ -205,18 +182,12 @@ describe('event/executor — executeEventForUsers', () => {
     });
 
     it('continues to next handler when afterExecution throws', async () => {
-      registerTestTask({
-        name: 'afterErrorTask',
-        afterExecution: async () => { throw new Error('after failed'); },
-      });
+      registerTestTask({ name: 'afterErrorTask', afterExecution: async () => { throw new Error('after failed'); } });
       registerTestTask({ name: 'nextTask' });
       await mgr.registerEventHandlers('EV', ['afterErrorTask', 'nextTask']);
-
       engineSandbox.sb.stub(TaskManager, 'executeTask').resolves();
 
-      await expect(
-        executeEventForUsers(makeEvent({ eventType: 'EV' }), [user1], mgr),
-      ).resolves.toBeUndefined();
+      await expect(executeEventForUsers(makeEvent({ eventType: 'EV' }), [user1], mgr)).resolves.toBeUndefined();
 
       const errorLogs = engineSandbox.logs.findByMessage('afterExecution failed');
       expect(errorLogs).toHaveLength(1);

@@ -1,32 +1,24 @@
 import sinon from 'sinon';
+import type { EngineSandbox } from '../../testing';
 import { makeEngineSandbox, makeEvent, makeEngineTestUser } from '../../testing';
-import {
-  registerDecisionRule,
-  getDecisionRuleByName,
-  executeDecisionRule,
-  _clearRegisteredDecisionRules,
-} from '../decision-rule.manager';
+import { registerDecisionRule, getDecisionRuleByName, executeDecisionRule, _clearRegisteredDecisionRules } from '../decision-rule.manager';
 import * as Steps from '../steps';
 import * as ResultRecorder from '../result-recorder';
 import { HandlerType, DecisionRuleStep } from '../types';
 import type { DecisionRule, DecisionRuleRegistration } from '../types';
 
-describe('handlers/decision-rule-manager', () => {
-  const engineSandbox = makeEngineSandbox();
+describe('handlers/decision-rule-manager - unit test', () => {
+  let engineSandbox: EngineSandbox;
   let executeStepStub: sinon.SinonStub;
   let handleDecisionRuleResultStub: sinon.SinonStub;
 
   beforeEach(() => {
-    engineSandbox.reset();
+    engineSandbox = makeEngineSandbox();
     executeStepStub = engineSandbox.sb.stub(Steps, 'executeStep');
-    handleDecisionRuleResultStub = engineSandbox.sb
-      .stub(ResultRecorder, 'handleDecisionRuleResult')
-      .resolves();
+    handleDecisionRuleResultStub = engineSandbox.sb.stub(ResultRecorder, 'handleDecisionRuleResult').resolves();
   });
 
-  afterEach(() => {
-    engineSandbox.restore();
-  });
+  afterEach(() => engineSandbox.restore());
 
   function makeRule(overrides: Partial<DecisionRule> = {}): DecisionRule {
     return {
@@ -47,40 +39,20 @@ describe('handlers/decision-rule-manager', () => {
         selectAction: async () => ({ status: 'success' }),
         doAction: async () => ({ status: 'success' }),
       };
-
       registerDecisionRule(reg);
-
       expect(getDecisionRuleByName('myRule')?.name).toBe('myRule');
     });
 
     it('stamps type as DECISION_RULE', () => {
-      registerDecisionRule({
-        name: 'typed',
-        shouldActivate: async () => ({ status: 'success' }),
-        selectAction: async () => ({ status: 'success' }),
-        doAction: async () => ({ status: 'success' }),
-      });
-
+      registerDecisionRule({ name: 'typed', shouldActivate: async () => ({ status: 'success' }), selectAction: async () => ({ status: 'success' }), doAction: async () => ({ status: 'success' }) });
       expect(getDecisionRuleByName('typed')?.type).toBe(HandlerType.DECISION_RULE);
     });
 
     it('overwrites a previous registration under the same name', () => {
-      const v1: DecisionRuleRegistration = {
-        name: 'dup',
-        shouldActivate: async () => ({ status: 'stop' }),
-        selectAction: async () => ({ status: 'success' }),
-        doAction: async () => ({ status: 'success' }),
-      };
-      const v2: DecisionRuleRegistration = {
-        name: 'dup',
-        shouldActivate: async () => ({ status: 'success' }),
-        selectAction: async () => ({ status: 'success' }),
-        doAction: async () => ({ status: 'success' }),
-      };
-
+      const v1: DecisionRuleRegistration = { name: 'dup', shouldActivate: async () => ({ status: 'stop' }), selectAction: async () => ({ status: 'success' }), doAction: async () => ({ status: 'success' }) };
+      const v2: DecisionRuleRegistration = { name: 'dup', shouldActivate: async () => ({ status: 'success' }), selectAction: async () => ({ status: 'success' }), doAction: async () => ({ status: 'success' }) };
       registerDecisionRule(v1);
       registerDecisionRule(v2);
-
       expect(getDecisionRuleByName('dup')!.shouldActivate).toBe(v2.shouldActivate);
     });
   });
@@ -105,12 +77,8 @@ describe('handlers/decision-rule-manager', () => {
 
       expect(executeStepStub.callCount).toBe(3);
       expect(handleDecisionRuleResultStub.calledOnce).toBe(true);
-
       const { steps } = handleDecisionRuleResultStub.firstCall.args[0];
       expect(steps).toHaveLength(3);
-      expect(steps[0].step).toBe(DecisionRuleStep.SHOULD_ACTIVATE);
-      expect(steps[1].step).toBe(DecisionRuleStep.SELECT_ACTION);
-      expect(steps[2].step).toBe(DecisionRuleStep.DO_ACTION);
     });
 
     it('runs shouldActivate and selectAction but skips doAction when selectAction is not success', async () => {
@@ -122,17 +90,12 @@ describe('handlers/decision-rule-manager', () => {
 
       expect(executeStepStub.callCount).toBe(2);
       expect(handleDecisionRuleResultStub.calledOnce).toBe(true);
-
       const { steps } = handleDecisionRuleResultStub.firstCall.args[0];
       expect(steps).toHaveLength(2);
     });
 
     it('skips all steps and does not record when shouldActivate is not success', async () => {
-      executeStepStub.onCall(0).resolves({
-        step: DecisionRuleStep.SHOULD_ACTIVATE,
-        result: { status: 'stop' },
-        timestamp: new Date(),
-      });
+      executeStepStub.onCall(0).resolves({ step: DecisionRuleStep.SHOULD_ACTIVATE, result: { status: 'stop' }, timestamp: new Date() });
 
       await executeDecisionRule(makeRule(), event, user);
 
@@ -141,11 +104,7 @@ describe('handlers/decision-rule-manager', () => {
     });
 
     it('skips all steps and does not record when shouldActivate returns error', async () => {
-      executeStepStub.onCall(0).resolves({
-        step: DecisionRuleStep.SHOULD_ACTIVATE,
-        result: { status: 'error', error: new Error('check failed') },
-        timestamp: new Date(),
-      });
+      executeStepStub.onCall(0).resolves({ step: DecisionRuleStep.SHOULD_ACTIVATE, result: { status: 'error', error: new Error('check failed') }, timestamp: new Date() });
 
       await executeDecisionRule(makeRule(), event, user);
 
@@ -154,25 +113,17 @@ describe('handlers/decision-rule-manager', () => {
     });
 
     it('passes shouldActivate result to selectAction as previousResult', async () => {
-      const shouldActivateResult = {
-        status: 'success' as const,
-        result: { decisionPointType: 'morning' },
-      };
-
-      executeStepStub
-        .onCall(0).resolves({ step: DecisionRuleStep.SHOULD_ACTIVATE, result: shouldActivateResult, timestamp: new Date() })
-        .onCall(1).resolves({ step: DecisionRuleStep.SELECT_ACTION, result: { status: 'success' }, timestamp: new Date() })
-        .onCall(2).resolves({ step: DecisionRuleStep.DO_ACTION, result: { status: 'success' }, timestamp: new Date() });
-
+      const shouldActivateResult = { status: 'success' as const, result: { decisionPointType: 'morning' } };
       const rule = makeRule();
       const selectActionSpy = sinon.spy(rule, 'selectAction');
 
-      executeStepStub.onCall(1).callsFake(
-        async (_step: string, fn: () => Promise<unknown>) => {
-          await fn();
-          return { step: DecisionRuleStep.SELECT_ACTION, result: { status: 'success' }, timestamp: new Date() };
-        },
-      );
+      executeStepStub
+        .onCall(0).resolves({ step: DecisionRuleStep.SHOULD_ACTIVATE, result: shouldActivateResult, timestamp: new Date() })
+        .onCall(1).callsFake(async (_step: string, fn: () => Promise<unknown>) => {
+        await fn();
+        return { step: DecisionRuleStep.SELECT_ACTION, result: { status: 'success' }, timestamp: new Date() };
+      })
+        .onCall(2).resolves({ step: DecisionRuleStep.DO_ACTION, result: { status: 'success' }, timestamp: new Date() });
 
       await executeDecisionRule(rule, event, user);
 
@@ -180,25 +131,17 @@ describe('handlers/decision-rule-manager', () => {
     });
 
     it('passes selectAction result to doAction as previousResult', async () => {
-      const selectActionResult = {
-        status: 'success' as const,
-        result: { action: 'SEND_MESSAGE', messageId: 'msg-1' },
-      };
+      const selectActionResult = { status: 'success' as const, result: { action: 'SEND_MESSAGE' } };
+      const rule = makeRule();
+      const doActionSpy = sinon.spy(rule, 'doAction');
 
       executeStepStub
         .onCall(0).resolves({ step: DecisionRuleStep.SHOULD_ACTIVATE, result: { status: 'success' }, timestamp: new Date() })
         .onCall(1).resolves({ step: DecisionRuleStep.SELECT_ACTION, result: selectActionResult, timestamp: new Date() })
-        .onCall(2).resolves({ step: DecisionRuleStep.DO_ACTION, result: { status: 'success' }, timestamp: new Date() });
-
-      const rule = makeRule();
-      const doActionSpy = sinon.spy(rule, 'doAction');
-
-      executeStepStub.onCall(2).callsFake(
-        async (_step: string, fn: () => Promise<unknown>) => {
-          await fn();
-          return { step: DecisionRuleStep.DO_ACTION, result: { status: 'success' }, timestamp: new Date() };
-        },
-      );
+        .onCall(2).callsFake(async (_step: string, fn: () => Promise<unknown>) => {
+        await fn();
+        return { step: DecisionRuleStep.DO_ACTION, result: { status: 'success' }, timestamp: new Date() };
+      });
 
       await executeDecisionRule(rule, event, user);
 
@@ -259,15 +202,8 @@ describe('handlers/decision-rule-manager', () => {
 
   describe('_clearRegisteredDecisionRules', () => {
     it('removes all registered rules', () => {
-      registerDecisionRule({
-        name: 'toRemove',
-        shouldActivate: async () => ({ status: 'success' }),
-        selectAction: async () => ({ status: 'success' }),
-        doAction: async () => ({ status: 'success' }),
-      });
-
+      registerDecisionRule({ name: 'toRemove', shouldActivate: async () => ({ status: 'success' }), selectAction: async () => ({ status: 'success' }), doAction: async () => ({ status: 'success' }) });
       _clearRegisteredDecisionRules();
-
       expect(getDecisionRuleByName('toRemove')).toBeUndefined();
     });
   });

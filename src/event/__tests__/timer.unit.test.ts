@@ -1,15 +1,16 @@
 import sinon from 'sinon';
+import type { EngineSandbox } from '../../testing';
 import { makeEngineSandbox } from '../../testing';
 import { IntervalTimerEventGenerator } from '../timer';
 import * as Queue from '../queue';
 
-describe('event/timer — IntervalTimerEventGenerator', () => {
-  const engineSandbox = makeEngineSandbox();
+describe('event/timer — unit test', () => {
+  let engineSandbox: EngineSandbox;
   let publishEventStub: sinon.SinonStub;
   let clock: sinon.SinonFakeTimers;
 
   beforeEach(() => {
-    engineSandbox.reset();
+    engineSandbox = makeEngineSandbox();
     publishEventStub = engineSandbox.sb.stub(Queue, 'publishEvent').resolves();
     clock = sinon.useFakeTimers();
   });
@@ -21,27 +22,19 @@ describe('event/timer — IntervalTimerEventGenerator', () => {
 
   describe('constructor guards', () => {
     it('throws when interval is zero', () => {
-      expect(() => new IntervalTimerEventGenerator(0, 'EV')).toThrow(
-        'interval must be greater than 0',
-      );
+      expect(() => new IntervalTimerEventGenerator(0, 'EV')).toThrow('interval must be greater than 0');
     });
 
     it('throws when interval is negative', () => {
-      expect(() => new IntervalTimerEventGenerator(-100, 'EV')).toThrow(
-        'interval must be greater than 0',
-      );
+      expect(() => new IntervalTimerEventGenerator(-100, 'EV')).toThrow('interval must be greater than 0');
     });
 
     it('throws when event type name is empty', () => {
-      expect(() => new IntervalTimerEventGenerator(1000, '')).toThrow(
-        'event type name is required',
-      );
+      expect(() => new IntervalTimerEventGenerator(1000, '')).toThrow('event type name is required');
     });
 
     it('throws when event type name is only whitespace', () => {
-      expect(() => new IntervalTimerEventGenerator(1000, '   ')).toThrow(
-        'event type name is required',
-      );
+      expect(() => new IntervalTimerEventGenerator(1000, '   ')).toThrow('event type name is required');
     });
   });
 
@@ -49,9 +42,7 @@ describe('event/timer — IntervalTimerEventGenerator', () => {
     it('publishes the event type on each tick', () => {
       const gen = new IntervalTimerEventGenerator(1000, 'TICK_EVENT');
       gen.start();
-
       clock.tick(3000);
-
       expect(publishEventStub.callCount).toBe(3);
       expect(publishEventStub.firstCall.args[0]).toBe('TICK_EVENT');
     });
@@ -59,11 +50,9 @@ describe('event/timer — IntervalTimerEventGenerator', () => {
     it('publishes a current timestamp on each tick', () => {
       const gen = new IntervalTimerEventGenerator(1000, 'TICK_EVENT');
       gen.start();
-
       const before = new Date(clock.now);
       clock.tick(1000);
       const after = new Date(clock.now);
-
       const publishedTimestamp = publishEventStub.firstCall.args[1] as Date;
       expect(publishedTimestamp.getTime()).toBeGreaterThanOrEqual(before.getTime());
       expect(publishedTimestamp.getTime()).toBeLessThanOrEqual(after.getTime());
@@ -72,11 +61,9 @@ describe('event/timer — IntervalTimerEventGenerator', () => {
     it('stops publishing after stop() is called', () => {
       const gen = new IntervalTimerEventGenerator(1000, 'STOP_EVENT');
       gen.start();
-
       clock.tick(2000);
       gen.stop();
       clock.tick(2000);
-
       expect(publishEventStub.callCount).toBe(2);
     });
 
@@ -96,10 +83,8 @@ describe('event/timer — IntervalTimerEventGenerator', () => {
       publishEventStub.rejects(new Error('queue down'));
       const gen = new IntervalTimerEventGenerator(1000, 'ERROR_EVENT');
       gen.start();
-
       clock.tick(1000);
       await Promise.resolve();
-
       const errorLogs = engineSandbox.logs.findByMessage('Failed to publish timer event');
       expect(errorLogs).toHaveLength(1);
       expect(errorLogs[0].entry.severity).toBe('ERROR');
@@ -109,39 +94,28 @@ describe('event/timer — IntervalTimerEventGenerator', () => {
   describe('simulated mode', () => {
     it('publishes events with timestamps based on simulatedStartDate', () => {
       const startDate = new Date('2024-01-01T00:00:00.000Z');
-
       const gen = new IntervalTimerEventGenerator(60_000, 'SIM_EVENT', {
         simulatedStartDate: startDate,
         simulatedTickDurationInMs: 10,
         simulatedTickCountMax: 3,
       });
-
       gen.start();
       clock.tick(30);
-
       expect(publishEventStub.callCount).toBe(3);
-
-      const ts0 = publishEventStub.getCall(0).args[1] as Date;
-      const ts1 = publishEventStub.getCall(1).args[1] as Date;
-      const ts2 = publishEventStub.getCall(2).args[1] as Date;
-
-      expect(ts0.getTime()).toBe(startDate.getTime());
-      expect(ts1.getTime()).toBe(startDate.getTime() + 60_000);
-      expect(ts2.getTime()).toBe(startDate.getTime() + 120_000);
+      expect(publishEventStub.getCall(0).args[1].getTime()).toBe(startDate.getTime());
+      expect(publishEventStub.getCall(1).args[1].getTime()).toBe(startDate.getTime() + 60_000);
+      expect(publishEventStub.getCall(2).args[1].getTime()).toBe(startDate.getTime() + 120_000);
     });
 
     it('advances timestamp by intervalInMs on each tick regardless of wall-clock speed', () => {
       const startDate = new Date('2024-01-01T00:00:00.000Z');
-
       const gen = new IntervalTimerEventGenerator(15 * 60_000, 'SIM_EVENT', {
         simulatedStartDate: startDate,
         simulatedTickDurationInMs: 5,
         simulatedTickCountMax: 2,
       });
-
       gen.start();
       clock.tick(10);
-
       const ts0 = publishEventStub.getCall(0).args[1] as Date;
       const ts1 = publishEventStub.getCall(1).args[1] as Date;
       expect(ts1.getTime() - ts0.getTime()).toBe(15 * 60_000);
@@ -153,10 +127,8 @@ describe('event/timer — IntervalTimerEventGenerator', () => {
         simulatedTickDurationInMs: 10,
         simulatedTickCountMax: 3,
       });
-
       gen.start();
       clock.tick(1000);
-
       expect(publishEventStub.callCount).toBe(3);
     });
 
@@ -166,14 +138,10 @@ describe('event/timer — IntervalTimerEventGenerator', () => {
         simulatedTickDurationInMs: 50,
         simulatedTickCountMax: 2,
       });
-
       gen.start();
       clock.tick(60);
-
       expect(publishEventStub.callCount).toBe(1);
-
       clock.tick(40);
-
       expect(publishEventStub.callCount).toBe(2);
     });
 
@@ -182,7 +150,6 @@ describe('event/timer — IntervalTimerEventGenerator', () => {
         simulatedStartDate: new Date(),
         simulatedTickCountMax: 2,
       });
-
       gen.start();
       clock.tick(500);
       expect(publishEventStub.callCount).toBe(1);
@@ -195,10 +162,8 @@ describe('event/timer — IntervalTimerEventGenerator', () => {
         simulatedStartDate: new Date(),
         simulatedTickDurationInMs: 10,
       });
-
       gen.start();
       clock.tick(200);
-
       expect(publishEventStub.callCount).toBe(10);
     });
   });

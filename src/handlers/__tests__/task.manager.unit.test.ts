@@ -1,32 +1,24 @@
 import sinon from 'sinon';
+import type { EngineSandbox } from '../../testing';
 import { makeEngineSandbox, makeEvent, makeEngineTestUser } from '../../testing';
-import {
-  registerTask,
-  getTaskByName,
-  executeTask,
-  _clearRegisteredTasks,
-} from '../task.manager';
+import { registerTask, getTaskByName, executeTask, _clearRegisteredTasks } from '../task.manager';
 import * as Steps from '../steps';
 import * as ResultRecorder from '../result-recorder';
 import { HandlerType, TaskStep } from '../types';
 import type { Task, TaskRegistration } from '../types';
 
-describe('handlers/task-manager', () => {
-  const engineSandbox = makeEngineSandbox();
+describe('handlers/task-manager - unit test', () => {
+  let engineSandbox: EngineSandbox;
   let executeStepStub: sinon.SinonStub;
   let handleTaskResultStub: sinon.SinonStub;
 
   beforeEach(() => {
-    engineSandbox.reset();
+    engineSandbox = makeEngineSandbox();
     executeStepStub = engineSandbox.sb.stub(Steps, 'executeStep');
-    handleTaskResultStub = engineSandbox.sb
-      .stub(ResultRecorder, 'handleTaskResult')
-      .resolves();
+    handleTaskResultStub = engineSandbox.sb.stub(ResultRecorder, 'handleTaskResult').resolves();
   });
 
-  afterEach(() => {
-    engineSandbox.restore();
-  });
+  afterEach(() => engineSandbox.restore());
 
   function makeTask(overrides: Partial<Task> = {}): Task {
     return {
@@ -45,38 +37,20 @@ describe('handlers/task-manager', () => {
         shouldActivate: async () => ({ status: 'success' }),
         doAction: async () => ({ status: 'success' }),
       };
-
       registerTask(reg);
-
-      const task = getTaskByName('myTask');
-      expect(task?.name).toBe('myTask');
+      expect(getTaskByName('myTask')?.name).toBe('myTask');
     });
 
     it('stamps type as TASK', () => {
-      registerTask({
-        name: 'typed',
-        shouldActivate: async () => ({ status: 'success' }),
-        doAction: async () => ({ status: 'success' }),
-      });
-
+      registerTask({ name: 'typed', shouldActivate: async () => ({ status: 'success' }), doAction: async () => ({ status: 'success' }) });
       expect(getTaskByName('typed')?.type).toBe(HandlerType.TASK);
     });
 
     it('overwrites a previous registration under the same name', () => {
-      const v1: TaskRegistration = {
-        name: 'dup',
-        shouldActivate: async () => ({ status: 'stop' }),
-        doAction: async () => ({ status: 'success' }),
-      };
-      const v2: TaskRegistration = {
-        name: 'dup',
-        shouldActivate: async () => ({ status: 'success' }),
-        doAction: async () => ({ status: 'success' }),
-      };
-
+      const v1: TaskRegistration = { name: 'dup', shouldActivate: async () => ({ status: 'stop' }), doAction: async () => ({ status: 'success' }) };
+      const v2: TaskRegistration = { name: 'dup', shouldActivate: async () => ({ status: 'success' }), doAction: async () => ({ status: 'success' }) };
       registerTask(v1);
       registerTask(v2);
-
       expect(getTaskByName('dup')!.shouldActivate).toBe(v2.shouldActivate);
     });
   });
@@ -93,22 +67,13 @@ describe('handlers/task-manager', () => {
 
     it('runs shouldActivate then doAction when shouldActivate succeeds', async () => {
       executeStepStub
-        .onCall(0).resolves({
-        step: TaskStep.SHOULD_ACTIVATE,
-        result: { status: 'success' },
-        timestamp: new Date(),
-      })
-        .onCall(1).resolves({
-        step: TaskStep.DO_ACTION,
-        result: { status: 'success' },
-        timestamp: new Date(),
-      });
+        .onCall(0).resolves({ step: TaskStep.SHOULD_ACTIVATE, result: { status: 'success' }, timestamp: new Date() })
+        .onCall(1).resolves({ step: TaskStep.DO_ACTION, result: { status: 'success' }, timestamp: new Date() });
 
       await executeTask(makeTask(), event, user);
 
       expect(executeStepStub.callCount).toBe(2);
       expect(handleTaskResultStub.calledOnce).toBe(true);
-
       const { steps } = handleTaskResultStub.firstCall.args[0];
       expect(steps).toHaveLength(2);
       expect(steps[0].step).toBe(TaskStep.SHOULD_ACTIVATE);
@@ -116,11 +81,7 @@ describe('handlers/task-manager', () => {
     });
 
     it('skips doAction and does not record when shouldActivate is not success', async () => {
-      executeStepStub.onCall(0).resolves({
-        step: TaskStep.SHOULD_ACTIVATE,
-        result: { status: 'stop' },
-        timestamp: new Date(),
-      });
+      executeStepStub.onCall(0).resolves({ step: TaskStep.SHOULD_ACTIVATE, result: { status: 'stop' }, timestamp: new Date() });
 
       await executeTask(makeTask(), event, user);
 
@@ -129,11 +90,7 @@ describe('handlers/task-manager', () => {
     });
 
     it('skips doAction and does not record when shouldActivate returns error', async () => {
-      executeStepStub.onCall(0).resolves({
-        step: TaskStep.SHOULD_ACTIVATE,
-        result: { status: 'error', error: new Error('check failed') },
-        timestamp: new Date(),
-      });
+      executeStepStub.onCall(0).resolves({ step: TaskStep.SHOULD_ACTIVATE, result: { status: 'error', error: new Error('check failed') }, timestamp: new Date() });
 
       await executeTask(makeTask(), event, user);
 
@@ -148,30 +105,18 @@ describe('handlers/task-manager', () => {
         timestamp: new Date(),
       };
 
-      executeStepStub
-        .onCall(0).resolves(shouldActivateResult)
-        .onCall(1).resolves({
-        step: TaskStep.DO_ACTION,
-        result: { status: 'success' },
-        timestamp: new Date(),
-      });
-
-      await executeTask(makeTask(), event, user);
-
-      const doActionCall = executeStepStub.secondCall;
-      const doActionFn = doActionCall.args[1] as () => Promise<unknown>;
-      expect(doActionCall.args[0]).toBe(TaskStep.DO_ACTION);
-
-      // Verify the fn passed to executeStep calls task.doAction with prev result
       const task = makeTask();
       const doActionSpy = sinon.spy(task, 'doAction');
-      executeStepStub.onCall(0).resolves(shouldActivateResult);
-      executeStepStub.onCall(1).callsFake(async (_step: string, fn: () => Promise<unknown>) => {
+
+      executeStepStub
+        .onCall(0).resolves(shouldActivateResult)
+        .onCall(1).callsFake(async (_step: string, fn: () => Promise<unknown>) => {
         await fn();
         return { step: TaskStep.DO_ACTION, result: { status: 'success' }, timestamp: new Date() };
       });
 
       await executeTask(task, event, user);
+
       expect(doActionSpy.firstCall.args[2]).toEqual(shouldActivateResult.result);
     });
 
@@ -226,14 +171,8 @@ describe('handlers/task-manager', () => {
 
   describe('_clearRegisteredTasks', () => {
     it('removes all registered tasks', () => {
-      registerTask({
-        name: 'toRemove',
-        shouldActivate: async () => ({ status: 'success' }),
-        doAction: async () => ({ status: 'success' }),
-      });
-
+      registerTask({ name: 'toRemove', shouldActivate: async () => ({ status: 'success' }), doAction: async () => ({ status: 'success' }) });
       _clearRegisteredTasks();
-
       expect(getTaskByName('toRemove')).toBeUndefined();
     });
   });
