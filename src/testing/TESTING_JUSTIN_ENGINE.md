@@ -9,7 +9,7 @@ first.
 
 ## The Two Engine Facades
 
-### `JustIn` (DB-backed)
+### `JustInEngine` (DB-backed)
 
 Requires `configureDB(...)` before `init()`. Uses `UserManager`, the event
 queue, and `DataManager` under the hood.
@@ -100,7 +100,7 @@ can stub them — ES module namespace exports are getter-only and cannot be
 stubbed directly:
 
 ```ts
-import { JustIn, _resetEngine, _coreForTesting } from '../engine';
+import { JustInEngine, _resetEngine, _coreForTesting } from '../engine';
 
 beforeEach(() => {
   engineSandbox.sb.stub(_coreForTesting.UserManager, 'init').resolves();
@@ -133,7 +133,7 @@ Pair `sinon.useFakeTimers()` with `clock.restore()` in `afterEach`, before
 
 ## Integration Test Setup
 
-### `JustIn` (DB-backed)
+### `JustInEngine` (DB-backed)
 
 ```ts
 import { MongoMemoryReplSet } from 'mongodb-memory-server';

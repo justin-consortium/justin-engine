@@ -44,7 +44,7 @@ const _intervalTimers = new Map<string, IntervalTimerEventGenerator>();
 const _core = { UserManager, shutdownCore };
 
 /**
- * The DB-backed JustIn engine.
+ * The DB-backed engine facade.
  *
  * Manages the full JITAI lifecycle for long-running server processes:
  * event queue, change stream listener, interval timers, and handler
@@ -60,31 +60,31 @@ const _core = { UserManager, shutdownCore };
  *
  * ```ts
  * import { configureDB, DBType, UserManager } from '@just-in/core';
- * import { JustIn } from '@just-in/engine';
+ * import { JustInEngine } from '@just-in/engine';
  *
  * configureDB({ dbType: DBType.MONGO, uri: process.env.MONGO_URI });
  *
- * JustIn.registerTask(FitbitUpdaterTask);
- * JustIn.registerDecisionRule(WalkingSuggestionDecisionRule);
- * await JustIn.registerEventHandlers('CLOCK_EVENT', [
+ * JustInEngine.registerTask(FitbitUpdaterTask);
+ * JustInEngine.registerDecisionRule(WalkingSuggestionDecisionRule);
+ * await JustInEngine.registerEventHandlers('CLOCK_EVENT', [
  *   FitbitUpdaterTask.name,
  *   WalkingSuggestionDecisionRule.name,
  * ]);
  *
- * await JustIn.init();
- * await JustIn.startEngine();
+ * await JustInEngine.init();
+ * await JustInEngine.startEngine();
  * ```
  *
  * ## Shutdown
  *
  * ```ts
  * process.on('SIGTERM', async () => {
- *   await JustIn.shutdown();
+ *   await JustInEngine.shutdown();
  *   process.exit(0);
  * });
  * ```
  */
-const JustIn = {
+const JustInEngine = {
 
   /**
    * Initialises the engine.
@@ -122,7 +122,7 @@ const JustIn = {
       return;
     }
     try {
-      await JustIn.stopEngine();
+      await JustInEngine.stopEngine();
       _intervalTimers.clear();
       EventHandlerManager.getInstance().clearEventHandlers();
       _isInitialized = false;
@@ -292,4 +292,4 @@ function _getIntervalTimers(): Map<string, IntervalTimerEventGenerator> {
   return _intervalTimers;
 }
 
-export { JustIn, _resetEngine, _getIntervalTimers, _core as _coreForTesting };
+export { JustInEngine, _resetEngine, _getIntervalTimers, _core as _coreForTesting };

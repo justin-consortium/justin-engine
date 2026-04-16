@@ -1,5 +1,5 @@
 /**
- * JustIn (DB-backed engine) E2E tests.
+ * JustInEngine (DB-backed engine) E2E tests.
  *
  * Verifies the public API as a third-party developer would use it.
  * Imports from '@just-in/engine' and '@just-in/core' only — both are
@@ -13,7 +13,7 @@ import sinon from 'sinon';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
 import { configureDB, DBType, shutdownCore, UserManager } from '@just-in/core';
 import { waitForMongoReady, silenceLogger } from '@just-in/core/testing';
-import { JustIn } from '../../index';
+import { JustInEngine } from '../../index';
 import type { TaskRegistration, DecisionRuleRegistration } from '../../index';
 
 let repl: MongoMemoryReplSet;
@@ -43,28 +43,28 @@ describe('engine/engine — e2e test', () => {
   });
 
   afterEach(async () => {
-    await JustIn.shutdown();
+    await JustInEngine.shutdown();
   });
 
   describe('init and shutdown', () => {
     it('initialises after configureDB is called', async () => {
-      await expect(JustIn.init()).resolves.toBeUndefined();
+      await expect(JustInEngine.init()).resolves.toBeUndefined();
     });
 
     it('init is idempotent — calling twice does not throw', async () => {
-      await JustIn.init();
-      await expect(JustIn.init()).resolves.toBeUndefined();
+      await JustInEngine.init();
+      await expect(JustInEngine.init()).resolves.toBeUndefined();
     });
 
     it('shutdown after init completes cleanly', async () => {
-      await JustIn.init();
-      await expect(JustIn.shutdown()).resolves.toBeUndefined();
+      await JustInEngine.init();
+      await expect(JustInEngine.shutdown()).resolves.toBeUndefined();
     });
   });
 
   describe('task pipeline', () => {
     it('executes a task for each user when an event is published', async () => {
-      await JustIn.init();
+      await JustInEngine.init();
       await UserManager.createUser({ uniqueIdentifier: 'alice', attributes: {} });
 
       const executedFor: string[] = [];
@@ -78,29 +78,29 @@ describe('engine/engine — e2e test', () => {
         },
       };
 
-      JustIn.registerTask(task);
-      await JustIn.registerEventHandlers('E2E_TASK_EVENT', ['e2eTask']);
-      await JustIn.publishEvent('E2E_TASK_EVENT', new Date());
-      await JustIn.startEngine();
+      JustInEngine.registerTask(task);
+      await JustInEngine.registerEventHandlers('E2E_TASK_EVENT', ['e2eTask']);
+      await JustInEngine.publishEvent('E2E_TASK_EVENT', new Date());
+      await JustInEngine.startEngine();
 
       expect(executedFor).toEqual(['alice']);
     });
 
     it('does not run doAction when shouldActivate returns stop', async () => {
-      await JustIn.init();
+      await JustInEngine.init();
       await UserManager.createUser({ uniqueIdentifier: 'bob', attributes: {} });
 
       let doActionCalled = false;
 
-      JustIn.registerTask({
+      JustInEngine.registerTask({
         name: 'stopTask',
         shouldActivate: async () => ({ status: 'stop' }),
         doAction: async () => { doActionCalled = true; return { status: 'success' }; },
       });
 
-      await JustIn.registerEventHandlers('STOP_TASK_EVENT', ['stopTask']);
-      await JustIn.publishEvent('STOP_TASK_EVENT', new Date());
-      await JustIn.startEngine();
+      await JustInEngine.registerEventHandlers('STOP_TASK_EVENT', ['stopTask']);
+      await JustInEngine.publishEvent('STOP_TASK_EVENT', new Date());
+      await JustInEngine.startEngine();
 
       expect(doActionCalled).toBe(false);
     });
@@ -108,7 +108,7 @@ describe('engine/engine — e2e test', () => {
 
   describe('decision rule pipeline', () => {
     it('runs all three steps when shouldActivate and selectAction succeed', async () => {
-      await JustIn.init();
+      await JustInEngine.init();
       await UserManager.createUser({ uniqueIdentifier: 'carol', attributes: {} });
 
       const steps: string[] = [];
@@ -120,30 +120,30 @@ describe('engine/engine — e2e test', () => {
         doAction: async () => { steps.push('doAction'); return { status: 'success' }; },
       };
 
-      JustIn.registerDecisionRule(rule);
-      await JustIn.registerEventHandlers('E2E_RULE_EVENT', ['e2eRule']);
-      await JustIn.publishEvent('E2E_RULE_EVENT', new Date());
-      await JustIn.startEngine();
+      JustInEngine.registerDecisionRule(rule);
+      await JustInEngine.registerEventHandlers('E2E_RULE_EVENT', ['e2eRule']);
+      await JustInEngine.publishEvent('E2E_RULE_EVENT', new Date());
+      await JustInEngine.startEngine();
 
       expect(steps).toEqual(['shouldActivate', 'selectAction', 'doAction']);
     });
 
     it('skips doAction when selectAction returns stop', async () => {
-      await JustIn.init();
+      await JustInEngine.init();
       await UserManager.createUser({ uniqueIdentifier: 'dave', attributes: {} });
 
       const steps: string[] = [];
 
-      JustIn.registerDecisionRule({
+      JustInEngine.registerDecisionRule({
         name: 'selectStopRule',
         shouldActivate: async () => { steps.push('shouldActivate'); return { status: 'success' }; },
         selectAction: async () => { steps.push('selectAction'); return { status: 'stop' }; },
         doAction: async () => { steps.push('doAction'); return { status: 'success' }; },
       });
 
-      await JustIn.registerEventHandlers('SELECT_STOP_EVENT', ['selectStopRule']);
-      await JustIn.publishEvent('SELECT_STOP_EVENT', new Date());
-      await JustIn.startEngine();
+      await JustInEngine.registerEventHandlers('SELECT_STOP_EVENT', ['selectStopRule']);
+      await JustInEngine.publishEvent('SELECT_STOP_EVENT', new Date());
+      await JustInEngine.startEngine();
 
       expect(steps).toEqual(['shouldActivate', 'selectAction']);
     });
@@ -151,27 +151,27 @@ describe('engine/engine — e2e test', () => {
 
   describe('handler ordering', () => {
     it('executes handlers in registration order — task before decision rule', async () => {
-      await JustIn.init();
+      await JustInEngine.init();
       await UserManager.createUser({ uniqueIdentifier: 'eve', attributes: {} });
 
       const order: string[] = [];
 
-      JustIn.registerTask({
+      JustInEngine.registerTask({
         name: 'firstTask',
         shouldActivate: async () => ({ status: 'success' }),
         doAction: async () => { order.push('task'); return { status: 'success' }; },
       });
 
-      JustIn.registerDecisionRule({
+      JustInEngine.registerDecisionRule({
         name: 'secondRule',
         shouldActivate: async () => ({ status: 'success' }),
         selectAction: async () => ({ status: 'success' }),
         doAction: async () => { order.push('rule'); return { status: 'success' }; },
       });
 
-      await JustIn.registerEventHandlers('ORDER_EVENT', ['firstTask', 'secondRule']);
-      await JustIn.publishEvent('ORDER_EVENT', new Date());
-      await JustIn.startEngine();
+      await JustInEngine.registerEventHandlers('ORDER_EVENT', ['firstTask', 'secondRule']);
+      await JustInEngine.publishEvent('ORDER_EVENT', new Date());
+      await JustInEngine.startEngine();
 
       expect(order).toEqual(['task', 'rule']);
     });
@@ -179,43 +179,43 @@ describe('engine/engine — e2e test', () => {
 
   describe('custom result writers', () => {
     it('configureTaskResultWriter receives the result envelope after task execution', async () => {
-      await JustIn.init();
+      await JustInEngine.init();
       await UserManager.createUser({ uniqueIdentifier: 'frank', attributes: {} });
 
       const captured: unknown[] = [];
-      JustIn.configureTaskResultWriter(async (record) => { captured.push(record); });
+      JustInEngine.configureTaskResultWriter(async (record) => { captured.push(record); });
 
-      JustIn.registerTask({
+      JustInEngine.registerTask({
         name: 'writerTask',
         shouldActivate: async () => ({ status: 'success' }),
         doAction: async () => ({ status: 'success' }),
       });
 
-      await JustIn.registerEventHandlers('WRITER_EVENT', ['writerTask']);
-      await JustIn.publishEvent('WRITER_EVENT', new Date());
-      await JustIn.startEngine();
+      await JustInEngine.registerEventHandlers('WRITER_EVENT', ['writerTask']);
+      await JustInEngine.publishEvent('WRITER_EVENT', new Date());
+      await JustInEngine.startEngine();
 
       expect(captured).toHaveLength(1);
       expect((captured[0] as Record<string, unknown>)['name']).toBe('writerTask');
     });
 
     it('configureDecisionRuleResultWriter receives the result envelope after rule execution', async () => {
-      await JustIn.init();
+      await JustInEngine.init();
       await UserManager.createUser({ uniqueIdentifier: 'grace', attributes: {} });
 
       const captured: unknown[] = [];
-      JustIn.configureDecisionRuleResultWriter(async (record) => { captured.push(record); });
+      JustInEngine.configureDecisionRuleResultWriter(async (record) => { captured.push(record); });
 
-      JustIn.registerDecisionRule({
+      JustInEngine.registerDecisionRule({
         name: 'writerRule',
         shouldActivate: async () => ({ status: 'success' }),
         selectAction: async () => ({ status: 'success' }),
         doAction: async () => ({ status: 'success' }),
       });
 
-      await JustIn.registerEventHandlers('WRITER_RULE_EVENT', ['writerRule']);
-      await JustIn.publishEvent('WRITER_RULE_EVENT', new Date());
-      await JustIn.startEngine();
+      await JustInEngine.registerEventHandlers('WRITER_RULE_EVENT', ['writerRule']);
+      await JustInEngine.publishEvent('WRITER_RULE_EVENT', new Date());
+      await JustInEngine.startEngine();
 
       expect(captured).toHaveLength(1);
       expect((captured[0] as Record<string, unknown>)['name']).toBe('writerRule');

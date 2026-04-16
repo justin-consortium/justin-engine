@@ -19,7 +19,7 @@ const ARCHIVED_EVENTS = 'archived_events';
  * Collection name for Decision Rule execution results.
  *
  * One document is written per Decision Rule per user per event when no custom
- * writer is configured via `JustIn.configureDecisionRuleResultWriter`.
+ * writer is configured via `JustInEngine.configureDecisionRuleResultWriter`.
  */
 const DECISION_RULE_RESULTS = 'decision_rule_results';
 
@@ -27,7 +27,7 @@ const DECISION_RULE_RESULTS = 'decision_rule_results';
  * Collection name for Task execution results.
  *
  * One document is written per Task per user per event when no custom writer
- * is configured via `JustIn.configureTaskResultWriter`.
+ * is configured via `JustInEngine.configureTaskResultWriter`.
  */
 const TASK_RESULTS = 'task_results';
 

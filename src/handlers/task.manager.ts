@@ -18,7 +18,7 @@ const _tasks: Map<string, Task> = new Map();
  * Overwrites any existing registration under the same name — re-registering
  * a task is safe and intentional for hot-reload scenarios.
  *
- * Called via `JustIn.registerTask(task)` or
+ * Called via `JustInEngine.registerTask(task)` or
  * `JustInServerless.registerTask(task)` — do not call this directly in
  * application code.
  *

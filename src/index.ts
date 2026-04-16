@@ -5,7 +5,7 @@
  *
  * Provides two engine facades:
  *
- * - {@link JustIn} — DB-backed engine for long-running server processes.
+ * - {@link JustInEngine} — DB-backed engine for long-running server processes.
  *   Requires `configureDB` from `@just-in/core` to be called before `init()`.
  *
  * - {@link JustInServerless} — in-memory engine for short-lived execution
@@ -14,12 +14,12 @@
  * ## Typical DB-backed startup
  * ```ts
  * import { configureDB, DBType } from '@just-in/core';
- * import { JustIn } from '@just-in/engine';
+ * import { JustInEngine } from '@just-in/engine';
  *
  * configureDB({ dbType: DBType.MONGO, uri: process.env.MONGO_URI });
  *
- * await JustIn.init();
- * await JustIn.startEngine();
+ * await JustInEngine.init();
+ * await JustInEngine.startEngine();
  * ```
  *
  * ## Typical serverless invocation
@@ -46,7 +46,7 @@
  * ```
  */
 
-export { JustIn } from './engine';
+export { JustInEngine } from './engine';
 export { JustInServerless } from './serverless';
 export type { ServerlessUserInput, NamespacedProtectedAttributesInput } from './serverless';
 

@@ -432,7 +432,7 @@ function reset(): void {
 }
 
 /**
- * The serverless JustIn engine.
+ * The serverless engine.
  *
  * Designed for short-lived execution contexts — Cloud Run functions, AWS
  * Lambda, scheduled jobs — where there is no persistent database connection.

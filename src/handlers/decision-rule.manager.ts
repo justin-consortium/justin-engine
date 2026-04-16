@@ -17,7 +17,7 @@ const _decisionRules: Map<string, DecisionRule> = new Map();
  *
  * Overwrites any existing registration under the same name.
  *
- * Called via `JustIn.registerDecisionRule(rule)` or
+ * Called via `JustInEngine.registerDecisionRule(rule)` or
  * `JustInServerless.registerDecisionRule(rule)` — do not call this directly
  * in application code.
  *

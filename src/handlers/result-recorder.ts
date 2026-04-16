@@ -41,7 +41,7 @@ function setResultRecorderPersistenceEnabled(enabled: boolean): void {
  * default path (DataManager for the DB-backed engine, INFO log for serverless)
  * so results are never silently lost.
  *
- * Called via `JustIn.configureDecisionRuleResultWriter(fn)` on the engine
+ * Called via `JustInEngine.configureDecisionRuleResultWriter(fn)` on the engine
  * facade — do not call this directly in application code.
  *
  * @param fn - The writer function. See {@link RecordResultFunction}.
@@ -60,7 +60,7 @@ function setDecisionRuleResultRecorder(fn: RecordResultFunction): void {
  *
  * If the writer throws, the recorder logs a warning and falls back.
  *
- * Called via `JustIn.configureTaskResultWriter(fn)` on the engine facade —
+ * Called via `JustInEngine.configureTaskResultWriter(fn)` on the engine facade —
  * do not call this directly in application code.
  *
  * @param fn - The writer function. See {@link RecordResultFunction}.
@@ -121,7 +121,7 @@ async function _persistOrLog(
  *
  * Resolution order:
  * 1. Custom decision rule writer if set — **replaces** DataManager entirely.
- *    Configure via `JustIn.configureDecisionRuleResultWriter(fn)`.
+ *    Configure via `JustInEngine.configureDecisionRuleResultWriter(fn)`.
  * 2. DataManager persistence to `decision_rule_results` (DB-backed engine only).
  * 3. INFO log with the full record — serverless engine default, or DB-backed
  *    engine fallback when DataManager fails.
@@ -154,7 +154,7 @@ async function handleDecisionRuleResult(record: RecordResult): Promise<void> {
  *
  * Resolution order:
  * 1. Custom task writer if set — **replaces** DataManager entirely.
- *    Configure via `JustIn.configureTaskResultWriter(fn)`.
+ *    Configure via `JustInEngine.configureTaskResultWriter(fn)`.
  * 2. Custom decision rule writer if set — tasks delegate to it when no task
  *    writer is configured, so a single writer can handle all handler results.
  * 3. DataManager persistence to `task_results` (DB-backed engine only).

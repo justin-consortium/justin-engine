@@ -1,7 +1,7 @@
 import sinon from 'sinon';
 import type { EngineSandbox } from '../../testing';
 import { makeEngineSandbox } from '../../testing';
-import { JustIn, _resetEngine, _getIntervalTimers, _coreForTesting } from '../engine';
+import { JustInEngine, _resetEngine, _getIntervalTimers, _coreForTesting } from '../engine';
 import { EventHandlerManager } from '../../event/manager';
 import * as Queue from '../../event/queue';
 
@@ -27,100 +27,100 @@ describe('engine/engine — unit test', () => {
 
   describe('init', () => {
     it('calls UserManager.init', async () => {
-      await JustIn.init();
+      await JustInEngine.init();
       expect(userManagerInitStub.calledOnce).toBe(true);
     });
 
     it('is idempotent — skips on second call without calling UserManager.init again', async () => {
-      await JustIn.init();
-      await JustIn.init();
+      await JustInEngine.init();
+      await JustInEngine.init();
       expect(userManagerInitStub.callCount).toBe(1);
     });
 
     it('logs a warning on the second call', async () => {
-      await JustIn.init();
-      await JustIn.init();
+      await JustInEngine.init();
+      await JustInEngine.init();
       const warnLogs = engineSandbox.logs.findByMessage('already initialized');
       expect(warnLogs).toHaveLength(1);
     });
 
     it('throws when UserManager.init throws', async () => {
       userManagerInitStub.rejects(new Error('db not configured'));
-      await expect(JustIn.init()).rejects.toThrow('db not configured');
+      await expect(JustInEngine.init()).rejects.toThrow('db not configured');
     });
   });
 
   describe('shutdown', () => {
     it('calls shutdownCore after stopping the engine', async () => {
-      await JustIn.init();
-      await JustIn.shutdown();
+      await JustInEngine.init();
+      await JustInEngine.shutdown();
       expect(stopQueueStub.calledOnce).toBe(true);
       expect(shutdownCoreStub.calledOnce).toBe(true);
     });
 
     it('is a no-op when not initialized', async () => {
-      await JustIn.shutdown();
+      await JustInEngine.shutdown();
       expect(shutdownCoreStub.called).toBe(false);
     });
 
     it('logs a warning when called before init', async () => {
-      await JustIn.shutdown();
+      await JustInEngine.shutdown();
       const warnLogs = engineSandbox.logs.findByMessage('not initialized');
       expect(warnLogs).toHaveLength(1);
     });
 
     it('clears event handlers on shutdown', async () => {
-      await JustIn.init();
-      await JustIn.registerEventHandlers('EV', ['h1']);
-      await JustIn.shutdown();
+      await JustInEngine.init();
+      await JustInEngine.registerEventHandlers('EV', ['h1']);
+      await JustInEngine.shutdown();
       expect(EventHandlerManager.getInstance().hasHandlersForEventType('EV')).toBe(false);
     });
 
     it('clears interval timers on shutdown', async () => {
-      await JustIn.init();
-      JustIn.createIntervalTimerEventGenerator('TIMER_EV', 1000);
-      await JustIn.shutdown();
+      await JustInEngine.init();
+      JustInEngine.createIntervalTimerEventGenerator('TIMER_EV', 1000);
+      await JustInEngine.shutdown();
       expect(_getIntervalTimers().size).toBe(0);
     });
 
     it('rethrows errors from shutdownCore', async () => {
-      await JustIn.init();
+      await JustInEngine.init();
       shutdownCoreStub.rejects(new Error('shutdown failed'));
-      await expect(JustIn.shutdown()).rejects.toThrow('shutdown failed');
+      await expect(JustInEngine.shutdown()).rejects.toThrow('shutdown failed');
     });
   });
 
   describe('startEngine', () => {
     it('starts event queue processing and drains the queue', async () => {
-      await JustIn.init();
-      await JustIn.startEngine();
+      await JustInEngine.init();
+      await JustInEngine.startEngine();
       expect(startQueueStub.calledOnce).toBe(true);
       expect(processQueueStub.calledOnce).toBe(true);
     });
 
     it('starts all registered interval timers', async () => {
-      await JustIn.init();
-      JustIn.createIntervalTimerEventGenerator('TIMER_EV', 1000);
+      await JustInEngine.init();
+      JustInEngine.createIntervalTimerEventGenerator('TIMER_EV', 1000);
       const timer = _getIntervalTimers().get('TIMER_EV')!;
       const startSpy = engineSandbox.sb.stub(timer, 'start');
-      await JustIn.startEngine();
+      await JustInEngine.startEngine();
       expect(startSpy.calledOnce).toBe(true);
     });
   });
 
   describe('stopEngine', () => {
     it('stops event queue processing', async () => {
-      await JustIn.init();
-      await JustIn.stopEngine();
+      await JustInEngine.init();
+      await JustInEngine.stopEngine();
       expect(stopQueueStub.calledOnce).toBe(true);
     });
 
     it('stops all registered interval timers', async () => {
-      await JustIn.init();
-      JustIn.createIntervalTimerEventGenerator('TIMER_EV', 1000);
+      await JustInEngine.init();
+      JustInEngine.createIntervalTimerEventGenerator('TIMER_EV', 1000);
       const timer = _getIntervalTimers().get('TIMER_EV')!;
       const stopSpy = engineSandbox.sb.stub(timer, 'stop');
-      await JustIn.stopEngine();
+      await JustInEngine.stopEngine();
       expect(stopSpy.calledOnce).toBe(true);
     });
   });
@@ -128,7 +128,7 @@ describe('engine/engine — unit test', () => {
   describe('registerTask', () => {
     it('registers a task retrievable by name', () => {
       const { getTaskByName } = require('../../handlers/task.manager');
-      JustIn.registerTask({ name: 'myTask', shouldActivate: async () => ({ status: 'success' }), doAction: async () => ({ status: 'success' }) });
+      JustInEngine.registerTask({ name: 'myTask', shouldActivate: async () => ({ status: 'success' }), doAction: async () => ({ status: 'success' }) });
       expect(getTaskByName('myTask')).toBeDefined();
     });
   });
@@ -136,25 +136,25 @@ describe('engine/engine — unit test', () => {
   describe('registerDecisionRule', () => {
     it('registers a rule retrievable by name', () => {
       const { getDecisionRuleByName } = require('../../handlers/decision-rule.manager');
-      JustIn.registerDecisionRule({ name: 'myRule', shouldActivate: async () => ({ status: 'success' }), selectAction: async () => ({ status: 'success' }), doAction: async () => ({ status: 'success' }) });
+      JustInEngine.registerDecisionRule({ name: 'myRule', shouldActivate: async () => ({ status: 'success' }), selectAction: async () => ({ status: 'success' }), doAction: async () => ({ status: 'success' }) });
       expect(getDecisionRuleByName('myRule')).toBeDefined();
     });
   });
 
   describe('registerEventHandlers', () => {
     it('registers event handlers on the EventHandlerManager', async () => {
-      await JustIn.registerEventHandlers('MY_EVENT', ['task1', 'rule1']);
+      await JustInEngine.registerEventHandlers('MY_EVENT', ['task1', 'rule1']);
       expect(EventHandlerManager.getInstance().hasHandlersForEventType('MY_EVENT')).toBe(true);
     });
 
     it('throws when event type is already registered', async () => {
-      await JustIn.registerEventHandlers('DUP', ['h1']);
-      await expect(JustIn.registerEventHandlers('DUP', ['h2'])).rejects.toThrow('already registered');
+      await JustInEngine.registerEventHandlers('DUP', ['h1']);
+      await expect(JustInEngine.registerEventHandlers('DUP', ['h2'])).rejects.toThrow('already registered');
     });
 
     it('overwrites when overwriteExisting is true', async () => {
-      await JustIn.registerEventHandlers('OW', ['h1']);
-      await JustIn.registerEventHandlers('OW', ['h2'], true);
+      await JustInEngine.registerEventHandlers('OW', ['h1']);
+      await JustInEngine.registerEventHandlers('OW', ['h2'], true);
       expect(EventHandlerManager.getInstance().getHandlersForEventType('OW')).toEqual(['h2']);
     });
   });
@@ -163,21 +163,21 @@ describe('engine/engine — unit test', () => {
     it('delegates to the queue publishEvent function', async () => {
       const publishStub = engineSandbox.sb.stub(Queue, 'publishEvent').resolves();
       const ts = new Date();
-      await JustIn.publishEvent('EV', ts, { key: 'val' });
+      await JustInEngine.publishEvent('EV', ts, { key: 'val' });
       expect(publishStub.calledOnceWith('EV', ts, { key: 'val' })).toBe(true);
     });
   });
 
   describe('createIntervalTimerEventGenerator', () => {
     it('adds a timer to the internal map', () => {
-      JustIn.createIntervalTimerEventGenerator('TIMER_EV', 1000);
+      JustInEngine.createIntervalTimerEventGenerator('TIMER_EV', 1000);
       expect(_getIntervalTimers().has('TIMER_EV')).toBe(true);
     });
 
     it('overwrites an existing timer with the same event type name', () => {
-      JustIn.createIntervalTimerEventGenerator('TIMER_EV', 1000);
+      JustInEngine.createIntervalTimerEventGenerator('TIMER_EV', 1000);
       const first = _getIntervalTimers().get('TIMER_EV');
-      JustIn.createIntervalTimerEventGenerator('TIMER_EV', 2000);
+      JustInEngine.createIntervalTimerEventGenerator('TIMER_EV', 2000);
       const second = _getIntervalTimers().get('TIMER_EV');
       expect(first).not.toBe(second);
     });
@@ -186,7 +186,7 @@ describe('engine/engine — unit test', () => {
   describe('configureTaskResultWriter / configureDecisionRuleResultWriter', () => {
     it('configureTaskResultWriter sets the task recorder', async () => {
       const writer = jest.fn().mockResolvedValue(undefined);
-      JustIn.configureTaskResultWriter(writer);
+      JustInEngine.configureTaskResultWriter(writer);
 
       const { handleTaskResult, __resetResultRecorderForTests } = require('../../handlers/result-recorder');
       const record = {
@@ -202,7 +202,7 @@ describe('engine/engine — unit test', () => {
 
     it('configureDecisionRuleResultWriter sets the decision rule recorder', async () => {
       const writer = jest.fn().mockResolvedValue(undefined);
-      JustIn.configureDecisionRuleResultWriter(writer);
+      JustInEngine.configureDecisionRuleResultWriter(writer);
 
       const { handleDecisionRuleResult, __resetResultRecorderForTests } = require('../../handlers/result-recorder');
       const record = {
@@ -219,14 +219,14 @@ describe('engine/engine — unit test', () => {
 
   describe('_resetEngine', () => {
     it('resets initialization state', async () => {
-      await JustIn.init();
+      await JustInEngine.init();
       _resetEngine();
-      await JustIn.init();
+      await JustInEngine.init();
       expect(userManagerInitStub.callCount).toBe(2);
     });
 
     it('clears interval timers', () => {
-      JustIn.createIntervalTimerEventGenerator('EV', 1000);
+      JustInEngine.createIntervalTimerEventGenerator('EV', 1000);
       _resetEngine();
       expect(_getIntervalTimers().size).toBe(0);
     });
