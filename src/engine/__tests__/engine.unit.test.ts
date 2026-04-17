@@ -186,7 +186,7 @@ describe('engine/engine — unit test', () => {
   describe('configureTaskResultWriter / configureDecisionRuleResultWriter', () => {
     it('configureTaskResultWriter sets the task recorder', async () => {
       const writer = jest.fn().mockResolvedValue(undefined);
-      JustInEngine.configureTaskResultWriter(writer);
+      JustInEngine.setTaskResultRecorder(writer);
 
       const { handleTaskResult, __resetResultRecorderForTests } = require('../../handlers/result-recorder');
       const record = {
@@ -202,7 +202,7 @@ describe('engine/engine — unit test', () => {
 
     it('configureDecisionRuleResultWriter sets the decision rule recorder', async () => {
       const writer = jest.fn().mockResolvedValue(undefined);
-      JustInEngine.configureDecisionRuleResultWriter(writer);
+      JustInEngine.setDecisionRuleResultRecorder(writer);
 
       const { handleDecisionRuleResult, __resetResultRecorderForTests } = require('../../handlers/result-recorder');
       const record = {

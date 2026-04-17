@@ -9,8 +9,8 @@ import {
   handleDecisionRuleResult,
   handleTaskResult,
   hasResultRecord,
-  setDecisionRuleResultRecorder,
-  setTaskResultRecorder,
+  _setDecisionRuleResultRecorder,
+  _setTaskResultRecorder,
   setResultRecorderPersistenceEnabled,
   __resetResultRecorderForTests,
 } from '../result-recorder';
@@ -57,7 +57,7 @@ describe('handlers/result-recorder - unit test', () => {
   describe('handleDecisionRuleResult', () => {
     it('calls custom recorder when one is set', async () => {
       const recorder = jest.fn().mockResolvedValue(undefined);
-      setDecisionRuleResultRecorder(recorder);
+      _setDecisionRuleResultRecorder(recorder);
 
       await handleDecisionRuleResult(makeRecord());
 
@@ -67,7 +67,7 @@ describe('handlers/result-recorder - unit test', () => {
 
     it('passes the full record to the custom recorder', async () => {
       const recorder = jest.fn().mockResolvedValue(undefined);
-      setDecisionRuleResultRecorder(recorder);
+      _setDecisionRuleResultRecorder(recorder);
       const record = makeRecord();
 
       await handleDecisionRuleResult(record);
@@ -76,7 +76,7 @@ describe('handlers/result-recorder - unit test', () => {
     });
 
     it('does not log when custom recorder succeeds', async () => {
-      setDecisionRuleResultRecorder(jest.fn().mockResolvedValue(undefined));
+      _setDecisionRuleResultRecorder(jest.fn().mockResolvedValue(undefined));
 
       await handleDecisionRuleResult(makeRecord());
 
@@ -95,7 +95,7 @@ describe('handlers/result-recorder - unit test', () => {
     });
 
     it('falls back to DataManager when custom recorder throws', async () => {
-      setDecisionRuleResultRecorder(jest.fn().mockRejectedValue(new Error('writer broke')));
+      _setDecisionRuleResultRecorder(jest.fn().mockRejectedValue(new Error('writer broke')));
       dm.addItemToCollection.resolves({ ok: true, successes: [] } as any);
 
       await handleDecisionRuleResult(makeRecord());
@@ -105,7 +105,7 @@ describe('handlers/result-recorder - unit test', () => {
 
     it('does nothing when steps array is empty', async () => {
       const recorder = jest.fn();
-      setDecisionRuleResultRecorder(recorder);
+      _setDecisionRuleResultRecorder(recorder);
 
       await handleDecisionRuleResult(makeRecord({ steps: [] }));
 
@@ -155,7 +155,7 @@ describe('handlers/result-recorder - unit test', () => {
   describe('handleTaskResult', () => {
     it('calls task recorder when one is set', async () => {
       const taskRecorder = jest.fn().mockResolvedValue(undefined);
-      setTaskResultRecorder(taskRecorder);
+      _setTaskResultRecorder(taskRecorder);
 
       await handleTaskResult(makeRecord());
 
@@ -165,7 +165,7 @@ describe('handlers/result-recorder - unit test', () => {
 
     it('delegates to decision rule recorder when no task recorder is set', async () => {
       const drRecorder = jest.fn().mockResolvedValue(undefined);
-      setDecisionRuleResultRecorder(drRecorder);
+      _setDecisionRuleResultRecorder(drRecorder);
 
       await handleTaskResult(makeRecord());
 
@@ -185,7 +185,7 @@ describe('handlers/result-recorder - unit test', () => {
     });
 
     it('falls back to DataManager when task recorder throws', async () => {
-      setTaskResultRecorder(jest.fn().mockRejectedValue(new Error('task writer broke')));
+      _setTaskResultRecorder(jest.fn().mockRejectedValue(new Error('task writer broke')));
       dm.addItemToCollection.resolves({ ok: true, successes: [] } as any);
 
       await handleTaskResult(makeRecord());
@@ -194,7 +194,7 @@ describe('handlers/result-recorder - unit test', () => {
     });
 
     it('falls back to DataManager when delegated DR recorder throws', async () => {
-      setDecisionRuleResultRecorder(jest.fn().mockRejectedValue(new Error('dr writer broke')));
+      _setDecisionRuleResultRecorder(jest.fn().mockRejectedValue(new Error('dr writer broke')));
       dm.addItemToCollection.resolves({ ok: true, successes: [] } as any);
 
       await handleTaskResult(makeRecord());
@@ -204,7 +204,7 @@ describe('handlers/result-recorder - unit test', () => {
 
     it('does nothing when steps array is empty', async () => {
       const recorder = jest.fn();
-      setTaskResultRecorder(recorder);
+      _setTaskResultRecorder(recorder);
 
       await handleTaskResult(makeRecord({ steps: [] }));
 
@@ -241,7 +241,7 @@ describe('handlers/result-recorder - unit test', () => {
 
     it('does not log when a custom writer is set and succeeds', async () => {
       setResultRecorderPersistenceEnabled(false);
-      setDecisionRuleResultRecorder(jest.fn().mockResolvedValue(undefined));
+      _setDecisionRuleResultRecorder(jest.fn().mockResolvedValue(undefined));
 
       await handleDecisionRuleResult(makeRecord());
 
@@ -251,7 +251,7 @@ describe('handlers/result-recorder - unit test', () => {
     it('still calls custom recorder when persistence is disabled', async () => {
       setResultRecorderPersistenceEnabled(false);
       const recorder = jest.fn().mockResolvedValue(undefined);
-      setDecisionRuleResultRecorder(recorder);
+      _setDecisionRuleResultRecorder(recorder);
 
       await handleDecisionRuleResult(makeRecord());
 
@@ -261,8 +261,8 @@ describe('handlers/result-recorder - unit test', () => {
 
   describe('__resetResultRecorderForTests', () => {
     it('clears custom recorders so DataManager is used again', async () => {
-      setDecisionRuleResultRecorder(jest.fn());
-      setTaskResultRecorder(jest.fn());
+      _setDecisionRuleResultRecorder(jest.fn());
+      _setTaskResultRecorder(jest.fn());
       __resetResultRecorderForTests();
 
       dm.addItemToCollection.resolves({ ok: true, successes: [] } as any);

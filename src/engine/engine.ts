@@ -17,8 +17,8 @@ import {
   _clearRegisteredTasks,
   _clearRegisteredDecisionRules,
   __resetResultRecorderForTests,
-  setDecisionRuleResultRecorder,
-  setTaskResultRecorder,
+  _setDecisionRuleResultRecorder,
+  _setTaskResultRecorder,
 } from '../handlers';
 import type { TaskRegistration, DecisionRuleRegistration, RecordResultFunction } from '../handlers';
 
@@ -254,28 +254,28 @@ const JustInEngine = {
   },
 
   /**
-   * Registers a custom writer for Task results.
+   * Registers a custom recorder for Task results.
    *
    * **Replaces** the default DataManager persistence path — DataManager is
-   * never called when a writer is set. Use this to route task execution
+   * never called when a recorder is set. Use this to route task execution
    * records to your own analytics pipeline, database, or logging service.
    *
-   * @param writer - The result writer function. See {@link RecordResultFunction}.
+   * @param recorder - The result recorder function. See {@link RecordResultFunction}.
    */
-  configureTaskResultWriter(writer: RecordResultFunction): void {
-    setTaskResultRecorder(writer);
+  setTaskResultRecorder(recorder: RecordResultFunction): void {
+    _setTaskResultRecorder(recorder);
   },
 
   /**
-   * Registers a custom writer for Decision Rule results.
+   * Registers a custom recorder for Decision Rule results.
    *
    * **Replaces** the default DataManager persistence path. A single decision
-   * rule writer also handles Task results when no task writer is configured.
+   * rule recorder also handles Task results when no task recorder is configured.
    *
-   * @param writer - The result writer function. See {@link RecordResultFunction}.
+   * @param recorder - The result recorder function. See {@link RecordResultFunction}.
    */
-  configureDecisionRuleResultWriter(writer: RecordResultFunction): void {
-    setDecisionRuleResultRecorder(writer);
+  setDecisionRuleResultRecorder(recorder: RecordResultFunction): void {
+    _setDecisionRuleResultRecorder(recorder);
   },
 };
 

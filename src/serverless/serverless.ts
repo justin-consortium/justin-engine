@@ -2,8 +2,8 @@ import { createLogger } from '@just-in/core';
 import type { JUser, NewUserRecord, ProtectedAttributesRecord } from '@just-in/core';
 import { EventHandlerManager, executeEventForUsers } from '../event';
 import type { JEvent } from '../event';
-import { registerTask as _registerTask, _clearRegisteredTasks, registerDecisionRule as _registerDecisionRule, _clearRegisteredDecisionRules, __resetResultRecorderForTests,   setDecisionRuleResultRecorder,
-  setTaskResultRecorder,
+import { registerTask as _registerTask, _clearRegisteredTasks, registerDecisionRule as _registerDecisionRule, _clearRegisteredDecisionRules, __resetResultRecorderForTests,   _setDecisionRuleResultRecorder,
+  _setTaskResultRecorder,
   setResultRecorderPersistenceEnabled, } from '../handlers';
 import type { TaskRegistration, DecisionRuleRegistration, RecordResultFunction } from '../handlers';
 import type { NamespacedProtectedAttributesInput, ServerlessUserInput} from "./types";
@@ -374,7 +374,7 @@ async function publishEvent(
  * @param writer - The result writer function. See {@link RecordResultFunction}.
  */
 function configureTaskResultWriter(writer: RecordResultFunction): void {
-  setTaskResultRecorder(writer);
+  _setTaskResultRecorder(writer);
 }
 
 /**
@@ -390,7 +390,7 @@ function configureTaskResultWriter(writer: RecordResultFunction): void {
  * @param writer - The result writer function. See {@link RecordResultFunction}.
  */
 function configureDecisionRuleResultWriter(writer: RecordResultFunction): void {
-  setDecisionRuleResultRecorder(writer);
+  _setDecisionRuleResultRecorder(writer);
 }
 
 /**

@@ -16,8 +16,8 @@ export { executeStep } from './steps';
 
 export {
   setResultRecorderPersistenceEnabled,
-  setDecisionRuleResultRecorder,
-  setTaskResultRecorder,
+  _setDecisionRuleResultRecorder,
+  _setTaskResultRecorder,
   handleDecisionRuleResult,
   handleTaskResult,
   hasResultRecord,

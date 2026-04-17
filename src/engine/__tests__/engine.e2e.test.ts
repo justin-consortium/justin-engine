@@ -183,7 +183,7 @@ describe('engine/engine — e2e test', () => {
       await UserManager.createUser({ uniqueIdentifier: 'frank', attributes: {} });
 
       const captured: unknown[] = [];
-      JustInEngine.configureTaskResultWriter(async (record) => { captured.push(record); });
+      JustInEngine.setTaskResultRecorder(async (record) => { captured.push(record); });
 
       JustInEngine.registerTask({
         name: 'writerTask',
@@ -204,7 +204,7 @@ describe('engine/engine — e2e test', () => {
       await UserManager.createUser({ uniqueIdentifier: 'grace', attributes: {} });
 
       const captured: unknown[] = [];
-      JustInEngine.configureDecisionRuleResultWriter(async (record) => { captured.push(record); });
+      JustInEngine.setDecisionRuleResultRecorder(async (record) => { captured.push(record); });
 
       JustInEngine.registerDecisionRule({
         name: 'writerRule',

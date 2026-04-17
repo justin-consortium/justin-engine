@@ -20,8 +20,8 @@ let _persistenceEnabled = true;
  * expected path for serverless deployments that have not configured a custom
  * writer — the log output is the audit trail.
  *
- * Custom writers registered via {@link setDecisionRuleResultRecorder} or
- * {@link setTaskResultRecorder} are always called regardless of this flag.
+ * Custom writers registered via {@link _setDecisionRuleResultRecorder} or
+ * {@link _setTaskResultRecorder} are always called regardless of this flag.
  *
  * Defaults to `true`.
  */
@@ -46,7 +46,7 @@ function setResultRecorderPersistenceEnabled(enabled: boolean): void {
  *
  * @param fn - The writer function. See {@link RecordResultFunction}.
  */
-function setDecisionRuleResultRecorder(fn: RecordResultFunction): void {
+function _setDecisionRuleResultRecorder(fn: RecordResultFunction): void {
   _recordDecisionRuleResultFn = fn;
 }
 
@@ -65,7 +65,7 @@ function setDecisionRuleResultRecorder(fn: RecordResultFunction): void {
  *
  * @param fn - The writer function. See {@link RecordResultFunction}.
  */
-function setTaskResultRecorder(fn: RecordResultFunction): void {
+function _setTaskResultRecorder(fn: RecordResultFunction): void {
   _recordTaskResultFn = fn;
 }
 
@@ -216,8 +216,8 @@ function __resetResultRecorderForTests(): void {
 
 export {
   setResultRecorderPersistenceEnabled,
-  setDecisionRuleResultRecorder,
-  setTaskResultRecorder,
+  _setDecisionRuleResultRecorder,
+  _setTaskResultRecorder,
   handleDecisionRuleResult,
   handleTaskResult,
   hasResultRecord,
