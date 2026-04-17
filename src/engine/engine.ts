@@ -210,7 +210,7 @@ const JustInEngine = {
   },
 
   /**
-   * Removes the handler registration for an event type.
+   * Removes handlers for an event type.
    *
    * @param eventType - The event type to unregister.
    */
