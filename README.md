@@ -78,7 +78,6 @@ yarn add @just-in/engine
 | **User management** | `UserManager` from `@just-in/core` | `loadUsers()` per invocation |
 | **Event queue** | Persisted to MongoDB, change-stream driven | Executed immediately and synchronously |
 | **Result storage** | Persisted to MongoDB | Logged at INFO (or custom writer) |
-| **State** | Persistent across invocations | Reset between invocations |
 
 ---
 
