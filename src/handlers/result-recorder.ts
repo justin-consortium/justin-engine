@@ -1,79 +1,115 @@
-import DataManager, { createLogger } from '@just-in/core';
-import { RecordResult, RecordResultFunction } from './handler.type';
+import { DataManager, createLogger } from '@just-in/core';
+import type { RecordResult, RecordResultFunction } from './types';
 import { DECISION_RULE_RESULTS, TASK_RESULTS } from '../constants';
 
-let recordDecisionRuleResultFn: RecordResultFunction | null = null;
-let recordTaskResultFn: RecordResultFunction | null = null;
-let _persistenceEnabled = true;
-
-// Lazy cache; do NOT call DataManager.getInstance() unless persistence is enabled.
-let _dm: ReturnType<typeof DataManager.getInstance> | null = null;
-
 const Log = createLogger({
-  context: {
-    component: 'ResultRecorder',
-  },
+  context: { package: '@just-in/engine', component: 'result-recorder' },
 });
 
+let _recordDecisionRuleResultFn: RecordResultFunction | null = null;
+let _recordTaskResultFn: RecordResultFunction | null = null;
+let _persistenceEnabled = true;
+
 /**
- * Enable/disable persistence attempts inside the result recorder.
- * When disabled, the recorder will NEVER call DataManager and will log instead.
+ * Enables or disables DataManager persistence for result recording.
+ *
+ * Set to `false` in {@link JustInServerless} — the serverless engine never
+ * touches DataManager. When disabled and no custom writer is configured, the
+ * recorder logs the full result record at INFO so it is captured by the cloud
+ * function's stdout stream (e.g. Cloud Run / GCP Logging). This is the
+ * expected path for serverless deployments that have not configured a custom
+ * writer — the log output is the audit trail.
+ *
+ * Custom writers registered via {@link _setDecisionRuleResultRecorder} or
+ * {@link _setTaskResultRecorder} are always called regardless of this flag.
+ *
+ * Defaults to `true`.
  */
-export function setResultRecorderPersistenceEnabled(enabled: boolean): void {
+function setResultRecorderPersistenceEnabled(enabled: boolean): void {
   _persistenceEnabled = enabled;
-  _dm = null;
-}
-
-// Lazy getter that respects _persistenceEnabled
-function getDataManagerSafe() {
-  if (!_persistenceEnabled) return null;
-  if (_dm) return _dm;
-  try {
-    _dm = DataManager.getInstance();
-  } catch {
-    _dm = null; // fallback: treat as unavailable
-  }
-  return _dm;
 }
 
 /**
- * Registers the function to handle results from decision rules.
+ * Registers a custom writer for Decision Rule results.
+ *
+ * When set, **completely replaces** the default persistence path — DataManager
+ * is never called. This gives the DB-backed engine consumer full control over
+ * where intervention results go: their own analytics pipeline, a different
+ * database, a message queue, etc.
+ *
+ * If the writer throws, the recorder logs a warning and falls back to the
+ * default path (DataManager for the DB-backed engine, INFO log for serverless)
+ * so results are never silently lost.
+ *
+ * Called via `JustInEngine.configureDecisionRuleResultWriter(fn)` on the engine
+ * facade — do not call this directly in application code.
+ *
+ * @param fn - The writer function. See {@link RecordResultFunction}.
  */
-export function setDecisionRuleResultRecorder(fn: RecordResultFunction): void {
-  recordDecisionRuleResultFn = fn;
+function _setDecisionRuleResultRecorder(fn: RecordResultFunction): void {
+  _recordDecisionRuleResultFn = fn;
 }
 
 /**
- * Registers the function to handle results from tasks.
+ * Registers a custom writer for Task results.
+ *
+ * When set, **completely replaces** the default persistence path — DataManager
+ * is never called. Falls through to the decision rule writer if no task writer
+ * is configured, so a single writer registered via
+ * `configureDecisionRuleResultWriter` can handle results from both handler types.
+ *
+ * If the writer throws, the recorder logs a warning and falls back.
+ *
+ * Called via `JustInEngine.configureTaskResultWriter(fn)` on the engine facade —
+ * do not call this directly in application code.
+ *
+ * @param fn - The writer function. See {@link RecordResultFunction}.
  */
-export function setTaskResultRecorder(fn: RecordResultFunction): void {
-  recordTaskResultFn = fn;
+function _setTaskResultRecorder(fn: RecordResultFunction): void {
+  _recordTaskResultFn = fn;
 }
 
 /**
- * Persist via DataManager if available; otherwise dev-log full record.
+ * The default persistence path when no custom writer is set.
+ *
+ * Two cases:
+ *
+ * **Persistence enabled (DB-backed engine):** attempts DataManager insert.
+ * On failure logs at WARN then logs the full record at INFO so no data is
+ * silently lost.
+ *
+ * **Persistence disabled (serverless engine):** skips DataManager entirely
+ * and logs the full record at INFO. In a serverless context the cloud
+ * function's stdout stream is the audit trail when no custom writer is
+ * configured. The full record is intentional — a summary would lose the step
+ * results needed for research analysis.
+ *
  * Never throws.
  */
-async function persistOrLog(
+async function _persistOrLog(
   collection: string,
   record: RecordResult,
   kind: 'task' | 'decision',
 ): Promise<void> {
-  try {
-    const dm = getDataManagerSafe();
-    if (dm) {
-      await dm.addItemToCollection(collection, record);
-      return;
+  if (_persistenceEnabled) {
+    try {
+      const result = await DataManager.getInstance().addItemToCollection(collection, record);
+      if (result.ok) return;
+      Log.warn('Result recorder: DataManager returned failure — result not persisted.', {
+        collection,
+        kind,
+        failures: result.failures,
+      });
+    } catch (error) {
+      Log.warn('Result recorder: DataManager threw — result not persisted.', {
+        collection,
+        kind,
+        error,
+      });
     }
-  } catch (error) {
-    Log.warn('Result recorder DataManager path failed; falling back to debug log.', {
-      collection,
-      kind,
-      error,
-    });
   }
 
-  Log.debug('[ResultRecorder:fallback]', {
+  Log.info('[result-recorder] Handler result.', {
     collection,
     kind,
     record,
@@ -81,65 +117,109 @@ async function persistOrLog(
 }
 
 /**
- * Handles a decision rule result (or default fallback).
+ * Records the result of a Decision Rule execution for a single user.
+ *
+ * Resolution order:
+ * 1. Custom decision rule writer if set — **replaces** DataManager entirely.
+ *    Configure via `JustInEngine.configureDecisionRuleResultWriter(fn)`.
+ * 2. DataManager persistence to `decision_rule_results` (DB-backed engine only).
+ * 3. INFO log with the full record — serverless engine default, or DB-backed
+ *    engine fallback when DataManager fails.
+ *
+ * Does nothing if `record.steps` is empty — a handler that did not activate
+ * produces no steps and there is nothing to record.
+ *
+ * Never throws.
  */
-export async function handleDecisionRuleResult(record: RecordResult): Promise<void> {
+async function handleDecisionRuleResult(record: RecordResult): Promise<void> {
   if (!hasResultRecord(record)) return;
 
-  if (recordDecisionRuleResultFn) {
+  if (_recordDecisionRuleResultFn) {
     try {
-      await recordDecisionRuleResultFn(record);
+      await _recordDecisionRuleResultFn(record);
       return;
     } catch (error) {
-      Log.warn('Decision rule result recorder failed; falling back to default.', {
+      Log.warn('Decision rule result writer failed; falling back to default.', {
         record,
         error,
       });
     }
   }
 
-  await persistOrLog(DECISION_RULE_RESULTS, record, 'decision');
+  await _persistOrLog(DECISION_RULE_RESULTS, record, 'decision');
 }
 
 /**
- * Handles a task result (delegates to decision rule writer if set), else default.
+ * Records the result of a Task execution for a single user.
+ *
+ * Resolution order:
+ * 1. Custom task writer if set — **replaces** DataManager entirely.
+ *    Configure via `JustInEngine.configureTaskResultWriter(fn)`.
+ * 2. Custom decision rule writer if set — tasks delegate to it when no task
+ *    writer is configured, so a single writer can handle all handler results.
+ * 3. DataManager persistence to `task_results` (DB-backed engine only).
+ * 4. INFO log with the full record — serverless engine default, or DB-backed
+ *    engine fallback when DataManager fails.
+ *
+ * Does nothing if `record.steps` is empty.
+ *
+ * Never throws.
  */
-export async function handleTaskResult(record: RecordResult): Promise<void> {
+async function handleTaskResult(record: RecordResult): Promise<void> {
   if (!hasResultRecord(record)) return;
 
-  if (recordTaskResultFn) {
+  if (_recordTaskResultFn) {
     try {
-      await recordTaskResultFn(record);
+      await _recordTaskResultFn(record);
       return;
     } catch (error) {
-      Log.warn('Task result recorder failed; falling back to default.', {
+      Log.warn('Task result writer failed; falling back to default.', {
         record,
         error,
       });
     }
-  } else if (recordDecisionRuleResultFn) {
+  } else if (_recordDecisionRuleResultFn) {
     try {
-      await recordDecisionRuleResultFn(record);
-      return; // success → skip fallback
+      await _recordDecisionRuleResultFn(record);
+      return;
     } catch (error) {
-      Log.warn('Delegated decision rule recorder failed; falling back to default.', {
+      Log.warn('Delegated decision rule writer failed; falling back to default.', {
         record,
         error,
       });
     }
   }
 
-  await persistOrLog(TASK_RESULTS, record, 'task');
+  await _persistOrLog(TASK_RESULTS, record, 'task');
 }
 
-/** True if there are any steps in the result object. */
-export function hasResultRecord(record: RecordResult): boolean {
+/**
+ * Returns `true` if `record` has at least one step entry.
+ *
+ * Used as a guard before recording — a handler that did not activate produces
+ * an empty steps array and should not be persisted.
+ */
+function hasResultRecord(record: RecordResult): boolean {
   return record.steps.length > 0;
 }
 
-export function __resetResultRecorderForTests(): void {
-  recordDecisionRuleResultFn = null;
-  recordTaskResultFn = null;
-  _dm = null;
+/**
+ * Resets all module-level recorder state to defaults.
+ *
+ * @internal — exported for use in `@just-in/engine/testing` only.
+ */
+function __resetResultRecorderForTests(): void {
+  _recordDecisionRuleResultFn = null;
+  _recordTaskResultFn = null;
   _persistenceEnabled = true;
 }
+
+export {
+  setResultRecorderPersistenceEnabled,
+  _setDecisionRuleResultRecorder,
+  _setTaskResultRecorder,
+  handleDecisionRuleResult,
+  handleTaskResult,
+  hasResultRecord,
+  __resetResultRecorderForTests,
+};

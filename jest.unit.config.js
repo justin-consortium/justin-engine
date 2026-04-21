@@ -5,11 +5,8 @@ module.exports = {
   transform: {
     '^.+\\.(ts|tsx)$': [
       'ts-jest',
-      {
-        tsconfig: 'tsconfig.json',
-      },
+      { tsconfig: 'tsconfig.jest.json' },
     ],
-    '^.+.tsx?$': ['ts-jest', {}],
   },
   testMatch: ['**/?(*.)unit.+(spec|test).+(ts|tsx|js)'],
   testPathIgnorePatterns: ['/node_modules/', '/dist/'],

@@ -1,30 +1,63 @@
-// Engine entrypoints
-export { JustInWrapper } from './JustInWrapper';
-export { JustInLite } from './JustInLite';
+/**
+ * @just-in/engine
+ *
+ * The intervention execution layer for the Justin JITAI ecosystem.
+ *
+ * Provides two engine facades:
+ *
+ * - {@link JustInEngine} — DB-backed engine for long-running server processes.
+ *   Requires `configureDB` from `@just-in/core` to be called before `init()`.
+ *
+ * - {@link JustInServerless} — in-memory engine for short-lived execution
+ *   contexts (Cloud Run, Lambda, scheduled jobs). No database required.
+ *
+ * ## Typical DB-backed startup
+ * ```ts
+ * import { configureDB, DBType } from '@just-in/core';
+ * import { JustInEngine } from '@just-in/engine';
+ *
+ * configureDB({ dbType: DBType.MONGO, uri: process.env.MONGO_URI });
+ *
+ * await JustInEngine.init();
+ * await JustInEngine.startEngine();
+ * ```
+ *
+ * ## Typical serverless invocation
+ * ```ts
+ * import { JustInServerless } from '@just-in/engine';
+ *
+ * export const runApp = async (cloudEvent) => {
+ *   try {
+ *     await JustInServerless.loadUsers(users);
+ *     await JustInServerless.registerEventHandlers('ClockEvent', [
+ *       FitbitUpdaterTask.name,
+ *       WalkingSuggestionDecisionRule.name,
+ *     ]);
+ *     await JustInServerless.publishEvent(
+ *       'ClockEvent',
+ *       cloudEvent.publish_time,
+ *       {},
+ *       cloudEvent.message_id,
+ *     );
+ *   } finally {
+ *     JustInServerless.reset();
+ *   }
+ * };
+ * ```
+ */
 
-// Types
-export type { JEvent } from './event/event.type';
+export { JustInEngine } from './engine';
+export { JustInServerless } from './serverless';
+export type { ServerlessUserInput, NamespacedProtectedAttributesInput } from './serverless';
+
+export type { JEvent, IntervalTimerEventGeneratorOptions } from './event';
+
 export type {
   TaskRegistration,
   DecisionRuleRegistration,
   StepReturnResult,
+  StepStatus,
   ExecuteStepReturn,
-} from './handlers/handler.type';
-
-/**
- * Core logger utilities, re-exported for convenience so 3PDs don't have
- * to depend on @just-in/core directly if they don't want to.
- */
-export { createLogger, configureLogger } from '@just-in/core';
-export type {
-  Logger,
-  LoggerEntry,
-  BaseSeverity,
-  LoggerCallback,
-  EmitFn,
-  LoggerConfig,
-} from '@just-in/core';
-
-/** User APIs commonly needed by event-driven apps. */
-export { UserManager } from '@just-in/core';
-export type { JUser, NewUserRecord } from '@just-in/core';
+  RecordResult,
+  RecordResultFunction,
+} from './handlers';
